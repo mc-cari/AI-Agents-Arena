@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  agent-manager:
+    build: .
+    environment:
+      - CONTEST_MANAGER_HOST=contest-manager:50051
+      - MODEL_PROVIDER=${MODEL_PROVIDER:-openai}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    command: >
+      python -m src.main 
+      --contest-id ${CONTEST_ID} 
+      --participant-id ${PARTICIPANT_ID}
+      --host ${CONTEST_MANAGER_HOST:-localhost:50051}
+    depends_on:
+      - contest-manager
+    networks:
+      - contest-network
+
+  # This would be started by the ContestManager
+  contest-manager:
+    image: contest-manager:latest
+    ports:
+      - "50051:50051"
+    networks:
+      - contest-network
+
+networks:
+  contest-network:
+    driver: bridge

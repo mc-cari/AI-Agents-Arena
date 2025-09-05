@@ -1,0 +1,13 @@
+grpcio==1.67.0
+grpcio-tools==1.67.0
+protobuf>=5.26.1,<6.0
+langchain>=0.3.0
+langchain-openai>=0.2.0
+langchain-anthropic>=0.2.0
+langchain-google-genai>=2.0.0
+langgraph>=0.2.0
+asyncio-throttle==1.0.2
+python-dotenv==1.0.0
+tenacity==8.2.3
+pydantic>=2.0.0
+typing-extensions>=4.0.0
