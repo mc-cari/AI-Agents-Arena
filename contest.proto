@@ -1,0 +1,209 @@
+syntax = "proto3";
+
+package contestmanager;
+
+option go_package = "contestmanager/api/grpc";
+
+enum Language {
+  LANGUAGE_UNSPECIFIED = 0;
+  LANGUAGE_CPP = 1;
+  LANGUAGE_PYTHON = 2;
+}
+
+import "google/protobuf/timestamp.proto";
+
+service ContestService {
+  rpc CreateContest(CreateContestRequest) returns (CreateContestResponse);
+  rpc CreateContestWithProblems(CreateContestWithProblemsRequest) returns (CreateContestResponse);
+  rpc GetContest(GetContestRequest) returns (GetContestResponse);
+  rpc ListContests(ListContestsRequest) returns (ListContestsResponse);
+  rpc SubmitSolution(SubmitSolutionRequest) returns (SubmitSolutionResponse);
+  rpc GetSubmissions(GetSubmissionsRequest) returns (GetSubmissionsResponse);
+  rpc GetLeaderboard(GetLeaderboardRequest) returns (GetLeaderboardResponse);
+  rpc StreamLeaderboard(StreamLeaderboardRequest) returns (stream LeaderboardUpdate);
+}
+
+enum ContestState {
+  CONTEST_STATE_UNSPECIFIED = 0;
+  CONTEST_STATE_RUNNING = 1;
+  CONTEST_STATE_FINISHED = 2;
+}
+
+enum SubmissionStatus {
+  SUBMISSION_STATUS_UNSPECIFIED = 0;
+  SUBMISSION_STATUS_PENDING = 1;
+  SUBMISSION_STATUS_COMPILING = 2;
+  SUBMISSION_STATUS_RUNNING = 3;
+  SUBMISSION_STATUS_ACCEPTED = 4;
+  SUBMISSION_STATUS_WRONG_ANSWER = 5;
+  SUBMISSION_STATUS_PRESENTATION_ERROR = 6;
+  SUBMISSION_STATUS_TIME_LIMIT_EXCEEDED = 7;
+  SUBMISSION_STATUS_MEMORY_LIMIT_EXCEEDED = 8;
+  SUBMISSION_STATUS_RUNTIME_ERROR = 9;
+  SUBMISSION_STATUS_COMPILATION_ERROR = 10;
+  SUBMISSION_STATUS_OUTPUT_LIMIT_EXCEEDED = 11;
+  SUBMISSION_STATUS_JUDGEMENT_FAILED = 12;
+}
+
+enum ProblemTag {
+  PROBLEM_TAG_UNSPECIFIED = 0;
+  PROBLEM_TAG_STRINGS = 1;
+  PROBLEM_TAG_GEOMETRY = 2;
+  PROBLEM_TAG_DYNAMIC_PROGRAMMING = 3;
+  PROBLEM_TAG_GRAPHS = 4;
+  PROBLEM_TAG_GREEDY = 5;
+  PROBLEM_TAG_MATH = 6;
+  PROBLEM_TAG_DATA_STRUCTURES = 7;
+  PROBLEM_TAG_SORTING = 8;
+  PROBLEM_TAG_BINARY_SEARCH = 9;
+  PROBLEM_TAG_TWO_POINTERS = 10;
+  PROBLEM_TAG_SLIDING_WINDOW = 11;
+  PROBLEM_TAG_BACKTRACKING = 12;
+  PROBLEM_TAG_BIT_MANIPULATION = 13;
+  PROBLEM_TAG_TREE = 14;
+  PROBLEM_TAG_HEAP = 15;
+  PROBLEM_TAG_STACK = 16;
+  PROBLEM_TAG_QUEUE = 17;
+  PROBLEM_TAG_HASH_TABLE = 18;
+  PROBLEM_TAG_ARRAY = 19;
+  PROBLEM_TAG_LINKED_LIST = 20;
+  PROBLEM_TAG_RECURSION = 21;
+  PROBLEM_TAG_DIVIDE_AND_CONQUER = 22;
+  PROBLEM_TAG_SIMULATION = 23;
+  PROBLEM_TAG_IMPLEMENTATION = 24;
+  PROBLEM_TAG_BRUTE_FORCE = 25;
+}
+
+enum ProblemStatus {
+  PROBLEM_STATUS_UNSPECIFIED = 0;
+  PROBLEM_STATUS_ACCEPTED = 1;
+  PROBLEM_STATUS_TRIED = 2;
+  PROBLEM_STATUS_NON_TRIED = 3;
+}
+
+
+
+message Problem {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  int32 time_limit_ms = 4;
+  int32 memory_limit_mb = 5;
+  ProblemTag tag = 6;
+}
+
+message Participant {
+  string id = 1;
+  string model_name = 2;
+  ParticipantResult result = 3;
+}
+
+message ProblemResult {
+  ProblemStatus status = 1;
+  int32 penalty_count = 2;
+  int32 penalty_seconds = 3;
+}
+
+message ParticipantResult {
+  int32 solved = 1;
+  int32 total_penalty_seconds = 2;
+  map<string, ProblemResult> problem_results = 3;
+  int32 rank = 4;
+}
+
+message Contest {
+  string id = 1;
+  ContestState state = 2;
+  google.protobuf.Timestamp started_at = 3;
+  google.protobuf.Timestamp ends_at = 4;
+  repeated Problem problems = 5;
+  repeated Participant participants = 6;
+}
+
+message Submission {
+  string id = 1;
+  string contest_id = 2;
+  string participant_id = 3;
+  string problem_id = 4;
+  string code = 5;
+  Language language = 6;
+  SubmissionStatus status = 7;
+  google.protobuf.Timestamp submitted_at = 8;
+  string verdict_message = 9;
+  int32 total_test_cases = 10;
+  int32 processed_test_cases = 11;
+}
+
+message CreateContestRequest {
+  int32 num_problems = 1;
+  repeated string participant_models = 2;
+}
+
+message CreateContestWithProblemsRequest {
+  repeated string problem_ids = 1;
+  repeated string participant_models = 2;
+}
+
+message CreateContestResponse {
+  string contest_id = 1;
+  Contest contest = 2;
+}
+
+message GetContestRequest {
+  string contest_id = 1;
+}
+
+message GetContestResponse {
+  Contest contest = 1;
+}
+
+message ListContestsRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+message ListContestsResponse {
+  repeated Contest contests = 1;
+  string next_page_token = 2;
+}
+
+message SubmitSolutionRequest {
+  string contest_id = 1;
+  string participant_id = 2;
+  string problem_id = 3;
+  string code = 4;
+  Language language = 5;
+}
+
+message SubmitSolutionResponse {
+  string submission_id = 1;
+  Submission submission = 2;
+}
+
+message GetSubmissionsRequest {
+  string contest_id = 1;
+  string participant_id = 2;
+  string problem_id = 3;
+}
+
+message GetSubmissionsResponse {
+  repeated Submission submissions = 1;
+}
+
+message GetLeaderboardRequest {
+  string contest_id = 1;
+}
+
+message GetLeaderboardResponse {
+  repeated Participant participants = 1;
+  google.protobuf.Timestamp updated_at = 2;
+}
+
+message StreamLeaderboardRequest {
+  string contest_id = 1;
+}
+
+message LeaderboardUpdate {
+  repeated Participant participants = 1;
+  google.protobuf.Timestamp updated_at = 2;
+}

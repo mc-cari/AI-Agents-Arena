@@ -1,0 +1,156 @@
+services:
+  postgres-test:
+    image: postgres:15-alpine
+    container_name: contestmanager-postgres-test
+    environment:
+      POSTGRES_DB: ${TEST_DB_NAME:-contestmanager_test}
+      POSTGRES_USER: ${TEST_DB_USER:-contestmanager}
+      POSTGRES_PASSWORD: ${TEST_DB_PASSWORD:-contestmanager_password}
+    ports:
+      - "5433:5432"  
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U contestmanager"]
+      interval: 0.5s
+      timeout: 2s
+      retries: 3
+    networks:
+      - test-network
+
+  redis-test:
+    image: redis:7-alpine
+    container_name: contestmanager-redis-test
+    ports:
+      - "6380:6379"  
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 0.5s
+      timeout: 2s
+      retries: 3
+    networks:
+      - test-network
+
+  integration-test:
+    build:
+      context: .
+      dockerfile: ContestManager/Dockerfile.test
+    container_name: contestmanager-integration-test
+    environment:
+      INTEGRATION_TESTS: "true"
+      DB_HOST: postgres-test
+      DB_PORT: 5432
+      DB_USER: ${TEST_DB_USER:-contestmanager}
+      DB_PASSWORD: ${TEST_DB_PASSWORD:-contestmanager_password}
+      DB_NAME: ${TEST_DB_NAME:-contestmanager_test}
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
+      REDIS_ADDR: redis-test:6379
+      REDIS_PASSWORD: ${TEST_REDIS_PASSWORD:-}
+      REDIS_DB: ${TEST_REDIS_DB:-1}
+      MAX_CONCURRENT_CONTESTS: ${TEST_MAX_CONCURRENT_CONTESTS:-3}
+      CONTEST_DURATION_SECONDS: ${TEST_CONTEST_DURATION_SECONDS:-300}
+      MAX_TOKENS_PER_CONTEST: ${TEST_MAX_TOKENS_PER_CONTEST:-200000}
+      LOG_LEVEL: ${TEST_LOG_LEVEL:-debug}
+      GORM_LOG_LEVEL: ${TEST_GORM_LOG_LEVEL:-error}
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+    restart: "no"
+    profiles:
+      - contestmanager
+    networks:
+      - test-network
+
+  test-worker:
+    build:
+      context: .
+      dockerfile: ContestManager/Dockerfile.worker
+    container_name: contestmanager-test-worker
+    environment:
+      REDIS_ADDR: redis-test:6379
+      REDIS_PASSWORD: ${TEST_REDIS_PASSWORD:-}
+      REDIS_DB: ${TEST_REDIS_DB:-1}
+      LOG_LEVEL: ${TEST_LOG_LEVEL:-debug}
+      GORM_LOG_LEVEL: ${TEST_GORM_LOG_LEVEL:-error}
+      WORKER_HEARTBEAT_INTERVAL: ${WORKER_HEARTBEAT_INTERVAL:-15}
+      WORKER_JOB_TIMEOUT: ${WORKER_JOB_TIMEOUT:-300}
+    volumes:
+      - /tmp:/tmp
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      redis-test:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - test-network
+
+  contestmanager-test:
+    build:
+      context: .
+      dockerfile: ContestManager/Dockerfile
+    container_name: contestmanager-test-app
+    environment:
+      DB_HOST: postgres-test
+      DB_PORT: 5432
+      DB_USER: ${TEST_DB_USER:-contestmanager}
+      DB_PASSWORD: ${TEST_DB_PASSWORD:-contestmanager_password}
+      DB_NAME: ${TEST_DB_NAME:-contestmanager_test}
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
+      REDIS_ADDR: redis-test:6379
+      REDIS_PASSWORD: ${TEST_REDIS_PASSWORD:-}
+      REDIS_DB: ${TEST_REDIS_DB:-1}
+      MAX_CONCURRENT_CONTESTS: ${TEST_MAX_CONCURRENT_CONTESTS:-3}
+      CONTEST_DURATION_SECONDS: ${TEST_CONTEST_DURATION_SECONDS:-300}
+      MAX_TOKENS_PER_CONTEST: ${TEST_MAX_TOKENS_PER_CONTEST:-200000}
+      LOG_LEVEL: ${TEST_LOG_LEVEL:-debug}
+      GORM_LOG_LEVEL: ${TEST_GORM_LOG_LEVEL:-error}
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+    restart: "no"
+    networks:
+      - test-network
+
+  agent-manager-test:
+    build: 
+      context: .
+      dockerfile: AgentManager/Dockerfile
+    container_name: agent-manager-test-app
+    environment:
+      - CONTEST_MANAGER_HOST=integration-test:50051
+      - TEMPERATURE=${TEMPERATURE:-0.1}
+      - MAX_TOKENS=${MAX_TOKENS:-4000}
+      - TIMEOUT=${TIMEOUT:-30.0}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - CONTEST_ID=${CONTEST_ID}
+      - PARTICIPANT_ID=${PARTICIPANT_ID}
+      - MAX_CONCURRENT_AGENTS=${MAX_CONCURRENT_AGENTS:-10}
+      - AGENT_TIMEOUT=${AGENT_TIMEOUT:-300.0}
+      - AGENT_LOG_LEVEL=${AGENT_LOG_LEVEL:-DEBUG}
+      - LOG_FORMAT=${LOG_FORMAT:-%(asctime)s - %(name)s - %(levelname)s - %(message)s}
+    command: >
+      python -m src.main 
+      --contest-id ${CONTEST_ID} 
+      --participant-id ${PARTICIPANT_ID}
+      --host ${CONTEST_MANAGER_HOST:-integration-test:50051}
+    depends_on:
+      - integration-test
+    restart: "no"
+    profiles:
+      - agentmanager
+    networks:
+      - test-network
+
+volumes:
+  postgres_test_data:
+
+networks:
+  test-network:
+    name: contestmanager_test_network
+    driver: bridge

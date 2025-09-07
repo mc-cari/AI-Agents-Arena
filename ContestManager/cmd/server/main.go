@@ -70,6 +70,7 @@ func main() {
 		problemResultRepo,
 		testCaseRepo,
 		contestCoordinator,
+		cfg,
 	)
 
 	server := grpcServer.NewServer()

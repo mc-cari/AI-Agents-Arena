@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"contestmanager/api/grpc"
+	"contestmanager/internal/config"
 	"contestmanager/internal/coordinator"
 	"contestmanager/internal/database"
 	"contestmanager/internal/models"
@@ -24,6 +25,7 @@ type ContestService struct {
 	problemResultRepo *database.ProblemResultRepository
 	testCaseRepo      *database.TestCaseRepository
 	coordinator       *coordinator.ContestCoordinator
+	config            *config.Config
 }
 
 func NewContestService(
@@ -34,6 +36,7 @@ func NewContestService(
 	problemResultRepo *database.ProblemResultRepository,
 	testCaseRepo *database.TestCaseRepository,
 	coordinator *coordinator.ContestCoordinator,
+	config *config.Config,
 ) *ContestService {
 	return &ContestService{
 		contestRepo:       contestRepo,
@@ -43,6 +46,7 @@ func NewContestService(
 		problemResultRepo: problemResultRepo,
 		testCaseRepo:      testCaseRepo,
 		coordinator:       coordinator,
+		config:            config,
 	}
 }
 
@@ -57,7 +61,7 @@ func (cs *ContestService) CreateContest(ctx context.Context, req *grpc.CreateCon
 	}
 
 	startTime := time.Now()
-	endTime := startTime.Add(5 * time.Minute)
+	endTime := startTime.Add(time.Duration(cs.config.Contest.DurationSeconds) * time.Second)
 
 
 
@@ -162,7 +166,7 @@ func (cs *ContestService) CreateContestWithProblems(ctx context.Context, req *gr
 	}
 
 	startTime := time.Now()
-	endTime := startTime.Add(5 * time.Minute)
+	endTime := startTime.Add(time.Duration(cs.config.Contest.DurationSeconds) * time.Second)
 
 	contest := &models.Contest{
 		State:       models.ContestStateRunning,

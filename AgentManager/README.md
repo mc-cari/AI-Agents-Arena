@@ -59,12 +59,29 @@ cp .env.example .env
 nano .env
 ```
 
-3. Set your API keys in `.env`:
+3. Configure your environment in `.env`:
 ```bash
+# Model Configuration
+TEMPERATURE=0.1
+MAX_TOKENS=4000
+TIMEOUT=30.0
+
+# API Keys
 OPENAI_API_KEY=your_openai_api_key_here
 ANTHROPIC_API_KEY=your_anthropic_api_key_here
 GOOGLE_API_KEY=your_google_api_key_here
-MODEL_NAME=gpt-4
+
+# Contest Configuration
+CONTEST_ID=your-contest-id
+PARTICIPANT_ID=your-participant-id
+
+# Agent Configuration
+MAX_CONCURRENT_AGENTS=10
+AGENT_TIMEOUT=300.0
+
+# Logging Configuration
+AGENT_LOG_LEVEL=INFO
+LOG_FORMAT=%(asctime)s - %(name)s - %(levelname)s - %(message)s
 ```
 
 4. Run an agent:
@@ -114,26 +131,31 @@ python -m src.main --list-models
 Create a `.env` file with your preferred settings:
 
 ```bash
-# LLM API Keys
-OPENAI_API_KEY=your_openai_api_key_here
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
-GOOGLE_API_KEY=your_google_api_key_here
-
 # Model Configuration
-MODEL_NAME=gpt-4
-
-# LLM Parameters
 TEMPERATURE=0.1
 MAX_TOKENS=4000
 TIMEOUT=30.0
+
+# API Keys
+OPENAI_API_KEY=your_openai_api_key_here
+ANTHROPIC_API_KEY=your_anthropic_api_key_here
+GOOGLE_API_KEY=your_google_api_key_here
 
 # Contest Configuration
 CONTEST_ID=your_contest_id
 PARTICIPANT_ID=your_participant_id
 
-# gRPC Server Configuration
-GRPC_SERVER_HOST=localhost
+# Network Configuration (from Docker)
+CONTEST_MANAGER_HOST=contestmanager:50051
 GRPC_SERVER_PORT=50051
+
+# Agent Configuration
+MAX_CONCURRENT_AGENTS=10
+AGENT_TIMEOUT=300.0
+
+# Logging Configuration
+AGENT_LOG_LEVEL=INFO
+LOG_FORMAT=%(asctime)s - %(name)s - %(levelname)s - %(message)s
 ```
 
 ### Programmatic Configuration

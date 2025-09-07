@@ -56,7 +56,6 @@ async def create_contest_and_agent():
         client.connect()
         print("✅ Connected to ContestManager server")
         
-        # Test basic connectivity by trying to list contests
         try:
             contests = client.list_contests()
             print(f"✅ Server connectivity verified - Found {len(contests)} existing contests")
@@ -184,13 +183,7 @@ async def main():
 
     print("Checking prerequisites...")
 
-    settings = get_settings()
 
-    if not settings.openai_api_key and not settings.anthropic_api_key and not settings.google_api_key:
-        print("⚠️  Warning: No LLM API keys found in environment")
-        print("   Set at least one of: OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY")
-        print("   The test will continue but agent creation may fail\n")
-    
     success = await create_contest_and_agent()
 
     return success

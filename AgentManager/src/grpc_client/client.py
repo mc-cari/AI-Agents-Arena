@@ -5,7 +5,6 @@ import os
 from typing import List, Optional
 from datetime import datetime
 
-# Add current directory to path for protobuf imports
 sys.path.append(os.path.dirname(__file__))
 
 import contest_pb2

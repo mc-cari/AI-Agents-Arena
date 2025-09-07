@@ -52,7 +52,7 @@ async def main():
         
         agent_manager = AgentManager()
         
-        model_name = args.model or settings.model_name
+        model_name = args.model or "gpt-4"
         agent = agent_manager.create_agent_from_model(
             model_name,
             client, 

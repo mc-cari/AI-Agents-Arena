@@ -112,6 +112,12 @@ func SetupTestEnvironment(t *testing.T) *TestEnvironment {
 		redisClient,
 	)
 
+	configConfig := &config.Config{
+		Database: cfg.Database,
+		Redis:    cfg.Redis,
+		Contest:  cfg.Contest,
+	}
+
 	contestService := services.NewContestService(
 		contestRepo,
 		problemRepo,
@@ -120,6 +126,7 @@ func SetupTestEnvironment(t *testing.T) *TestEnvironment {
 		problemResultRepo,
 		testCaseRepo,
 		coord,
+		configConfig,
 	)
 
 	err = db.AutoMigrate()

@@ -4,13 +4,15 @@ RUN apk add --no-cache git postgresql-client
 
 WORKDIR /app
 
-COPY go.mod go.sum ./
+COPY ContestManager/go.mod ContestManager/go.sum ./
 
 RUN go mod download
 
-RUN go get github.com/stretchr/testify
+RUN go mod verify
 
-COPY . .
+COPY ContestManager/ .
+
+RUN go mod tidy
 
 RUN mkdir -p bin
 RUN go build -o bin/import-problems ./cmd/import-problems

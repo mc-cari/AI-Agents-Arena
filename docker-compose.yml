@@ -1,0 +1,173 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: contestmanager-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-contestmanager}
+      POSTGRES_USER: ${POSTGRES_USER:-contestmanager}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-contestmanager_password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U contestmanager"]
+      interval: 0.5s
+      timeout: 2s
+      retries: 3
+    networks:
+      - contest-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: contestmanager-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 0.5s
+      timeout: 2s
+      retries: 3
+    networks:
+      - contest-network
+
+  contestmanager:
+    build: 
+      context: .
+      dockerfile: ContestManager/Dockerfile
+    container_name: contestmanager-app
+    ports:
+      - "${GRPC_PORT:-50051}:${GRPC_PORT:-50051}"
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-contestmanager}
+      DB_PASSWORD: ${DB_PASSWORD:-contestmanager_password}
+      DB_NAME: ${DB_NAME:-contestmanager}
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_DB: ${REDIS_DB:-0}
+      GRPC_PORT: ${GRPC_PORT:-50051}
+      HTTP_PORT: ${HTTP_PORT:-8080}
+      MAX_CONCURRENT_CONTESTS: ${MAX_CONCURRENT_CONTESTS:-3}
+      CONTEST_DURATION_SECONDS: ${CONTEST_DURATION_SECONDS:-300}
+      MAX_TOKENS_PER_CONTEST: ${MAX_TOKENS_PER_CONTEST:-200000}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      GORM_LOG_LEVEL: ${GORM_LOG_LEVEL:-error}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - contest-network
+
+  agent-manager:
+    build: 
+      context: ./AgentManager
+      dockerfile: Dockerfile
+    container_name: agent-manager
+    environment:
+      - CONTEST_MANAGER_HOST=contestmanager:50051
+      - TEMPERATURE=${TEMPERATURE:-0.1}
+      - MAX_TOKENS=${MAX_TOKENS:-4000}
+      - TIMEOUT=${TIMEOUT:-30.0}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - CONTEST_ID=${CONTEST_ID:-default-contest}
+      - PARTICIPANT_ID=${PARTICIPANT_ID:-default-participant}
+      - MAX_CONCURRENT_AGENTS=${MAX_CONCURRENT_AGENTS:-10}
+      - AGENT_TIMEOUT=${AGENT_TIMEOUT:-300.0}
+      - AGENT_LOG_LEVEL=${AGENT_LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-%(asctime)s - %(name)s - %(levelname)s - %(message)s}
+    command: >
+      python -m src.main 
+      --contest-id ${CONTEST_ID:-default-contest} 
+      --participant-id ${PARTICIPANT_ID:-default-participant}
+      --host ${CONTEST_MANAGER_HOST:-contestmanager:50051}
+    depends_on:
+      - contestmanager
+    networks:
+      - contest-network
+    profiles:
+      - agent
+
+  worker:
+    build: 
+      context: .
+      dockerfile: ContestManager/Dockerfile.worker
+    environment:
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_DB: ${REDIS_DB:-0}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      GORM_LOG_LEVEL: ${GORM_LOG_LEVEL:-error}
+      WORKER_HEARTBEAT_INTERVAL: ${WORKER_HEARTBEAT_INTERVAL:-15}
+      WORKER_JOB_TIMEOUT: ${WORKER_JOB_TIMEOUT:-300}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp:/tmp
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      replicas: 3
+    networks:
+      - contest-network
+
+  import-problems:
+    build: 
+      context: .
+      dockerfile: ContestManager/Dockerfile
+    container_name: contestmanager-import-problems
+    command: ["./import-problems", "-"]
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-contestmanager}
+      DB_PASSWORD: ${DB_PASSWORD:-contestmanager_password}
+      DB_NAME: ${DB_NAME:-contestmanager}
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
+    volumes:
+      - ./ContestManager/data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    profiles:
+      - import
+    networks:
+      - contest-network
+
+  delete-problem:
+    build: 
+      context: .
+      dockerfile: ContestManager/Dockerfile
+    container_name: contestmanager-delete-problem
+    command: ["./delete-problem", "Make Them Even"]
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-contestmanager}
+      DB_PASSWORD: ${DB_PASSWORD:-contestmanager_password}
+      DB_NAME: ${DB_NAME:-contestmanager}
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    profiles:
+      - delete
+    networks:
+      - contest-network
+
+volumes:
+  postgres_data:
+
+networks:
+  contest-network:
+    driver: bridge
