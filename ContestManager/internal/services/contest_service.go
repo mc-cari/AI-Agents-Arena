@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"contestmanager/api/grpc"
+	"contestmanager/internal/clients"
 	"contestmanager/internal/config"
 	"contestmanager/internal/coordinator"
 	"contestmanager/internal/database"
@@ -26,6 +27,7 @@ type ContestService struct {
 	testCaseRepo      *database.TestCaseRepository
 	coordinator       *coordinator.ContestCoordinator
 	config            *config.Config
+	agentManager      *clients.AgentManagerClient
 }
 
 func NewContestService(
@@ -38,6 +40,12 @@ func NewContestService(
 	coordinator *coordinator.ContestCoordinator,
 	config *config.Config,
 ) *ContestService {
+	agentManager, err := clients.NewAgentManagerClient(config.AgentManager.Address)
+	if err != nil {
+		log.Printf("Warning: Failed to initialize agent manager client: %v", err)
+		log.Printf("Agents will not be automatically created for contests")
+	}
+
 	return &ContestService{
 		contestRepo:       contestRepo,
 		problemRepo:       problemRepo,
@@ -47,12 +55,11 @@ func NewContestService(
 		testCaseRepo:      testCaseRepo,
 		coordinator:       coordinator,
 		config:            config,
+		agentManager:      agentManager,
 	}
 }
 
 func (cs *ContestService) CreateContest(ctx context.Context, req *grpc.CreateContestRequest) (*grpc.CreateContestResponse, error) {
-
-
 	if req.NumProblems <= 0 {
 		return nil, fmt.Errorf("invalid num_problems: %d", req.NumProblems)
 	}
@@ -63,8 +70,6 @@ func (cs *ContestService) CreateContest(ctx context.Context, req *grpc.CreateCon
 	startTime := time.Now()
 	endTime := startTime.Add(time.Duration(cs.config.Contest.DurationSeconds) * time.Second)
 
-
-
 	contest := &models.Contest{
 		State:       models.ContestStateRunning,
 		StartedAt:   startTime,
@@ -72,33 +77,25 @@ func (cs *ContestService) CreateContest(ctx context.Context, req *grpc.CreateCon
 		NumProblems: req.NumProblems,
 	}
 
-
 	err := cs.contestRepo.CreateContest(ctx, contest)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create contest: %w", err)
 	}
-
-
 
 	randomProblems, err := cs.problemRepo.GetRandomProblems(ctx, int(req.NumProblems))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get random problems: %w", err)
 	}
 
-
 	if len(randomProblems) < int(req.NumProblems) {
 		return nil, fmt.Errorf("not enough problems available")
 	}
-
-
-		for _, p := range randomProblems {
-		
-		if err := cs.problemRepo.AddProblemToContest(ctx, contest.ID, p.ID); err != nil {
-			return nil, fmt.Errorf("failed to add problem to contest: %w", err)
-		}
+	for _, p := range randomProblems {
+	
+	if err := cs.problemRepo.AddProblemToContest(ctx, contest.ID, p.ID); err != nil {
+		return nil, fmt.Errorf("failed to add problem to contest: %w", err)
 	}
-
-
+	}
 
 	var participants []*models.Participant
 	for _, modelName := range req.ParticipantModels {
@@ -119,8 +116,6 @@ func (cs *ContestService) CreateContest(ctx context.Context, req *grpc.CreateCon
 		participants = append(participants, participant)
 	}
 
-
-
 	for _, participant := range participants {
 		for _, problem := range randomProblems {
 			problemResult := &models.ProblemResult{
@@ -136,14 +131,31 @@ func (cs *ContestService) CreateContest(ctx context.Context, req *grpc.CreateCon
 		}
 	}
 
-
-
-
+	if cs.agentManager != nil {
+		log.Printf("Creating agents for %d participants in contest %s", len(participants), contest.ID)
+		for _, participant := range participants {
+			agentID, err := cs.agentManager.CreateAgent(
+				ctx,
+				contest.ID.String(),
+				participant.ID.String(),
+				participant.ModelName,
+				cs.config.Server.Address,
+			)
+			if err != nil {
+				log.Printf("Failed to create agent for participant %s (model: %s): %v", 
+					participant.ID, participant.ModelName, err)
+				continue
+			}
+			log.Printf("Successfully created agent %s for participant %s (model: %s)", 
+				agentID, participant.ID, participant.ModelName)
+		}
+	} else {
+		log.Printf("Agent manager not available, skipping agent creation for contest %s", contest.ID)
+	}
 
 	if err := cs.coordinator.StartContest(contest.ID); err != nil {
 		return nil, fmt.Errorf("failed to start contest in coordinator: %w", err)
 	}
-
 
 	grpcContest, err := cs.getCompleteContestData(ctx, contest.ID)
 	if err != nil {
@@ -261,8 +273,6 @@ func (s *ContestService) GetContest(ctx context.Context, req *grpc.GetContestReq
 	if err != nil {
 		return nil, fmt.Errorf("failed to get contest: %w", err)
 	}
-
-
 
 	grpcContest, err := s.getCompleteContestData(ctx, contestID)
 	if err != nil {
@@ -399,7 +409,6 @@ func (s *ContestService) SubmitSolution(ctx context.Context, req *grpc.SubmitSol
 		ProcessedTestCases: 0,
 	}
 
-
 	if err := s.submissionRepo.CreateSubmission(ctx, &submission); err != nil {
 		return nil, fmt.Errorf("failed to create submission: %w", err)
 	}
@@ -461,8 +470,6 @@ func (s *ContestService) GetSubmissions(ctx context.Context, req *grpc.GetSubmis
 		return nil, fmt.Errorf("failed to get submissions: %w", err)
 	}
 
-
-
 	grpcSubmissions := make([]*grpc.Submission, len(submissions))
 	for i, submission := range submissions {
 		grpcSubmissions[i] = ConvertSubmissionToGRPC(&submission)
@@ -472,8 +479,6 @@ func (s *ContestService) GetSubmissions(ctx context.Context, req *grpc.GetSubmis
 		Submissions: grpcSubmissions,
 	}, nil
 }
-
-
 
 func (s *ContestService) StreamLeaderboard(req *grpc.StreamLeaderboardRequest, stream grpc.ContestService_StreamLeaderboardServer) error {
 	contestID, err := uuid.Parse(req.ContestId)

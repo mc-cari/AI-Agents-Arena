@@ -145,6 +145,17 @@ func importProblem(problemPath string, db *database.GormDB) error {
 		}
 	}
 
+	sourceURL := metadata.SourceURL
+	if sourceURL == "" && metadata.ContestID != "" && metadata.ProblemLetter != "" {
+		sourceURL = fmt.Sprintf("https://atcoder.jp/contests/%s/tasks/%s_%s",
+			strings.ToLower(metadata.ContestID),
+			strings.ToLower(metadata.ContestID),
+			strings.ToLower(metadata.ProblemLetter))
+	}
+	if sourceURL == "" {
+		sourceURL = "UNKNOWN"
+	}
+
 	problem := &models.Problem{
 		ID:            uuid.New(),
 		Name:          metadata.Name,
@@ -152,6 +163,7 @@ func importProblem(problemPath string, db *database.GormDB) error {
 		TimeLimitMs:   metadata.TimeLimitMs,
 		MemoryLimitMb: metadata.MemoryLimitMb,
 		Tag:           problemTag,
+		Source:        sourceURL,
 	}
 
 	if err := db.DB.Create(&problem).Error; err != nil {

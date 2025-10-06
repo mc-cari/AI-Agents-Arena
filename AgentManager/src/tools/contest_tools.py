@@ -114,7 +114,6 @@ class SubmitSolutionInput(BaseModel):
 
 
 class SubmitSolutionTool(ContestTool):
-    
     name: str = "submit_solution"
     description: str = "Submit a solution code for a specific problem"
     args_schema: Type[BaseModel] = SubmitSolutionInput
@@ -172,21 +171,17 @@ class ViewContestTool(ContestTool):
         return info
 
 class SelectProblemInput(BaseModel):
-    """Input for problem selection."""
     contest_id: str = Field(description="The ID of the contest")
     solved_problems: List[str] = Field(description="List of already solved problem IDs")
     time_remaining: int = Field(description="Time remaining in seconds")
 
 
 class SelectProblemTool(ContestTool):
-    """Tool to help LLM select the best problem to solve next."""
-    
     name: str = "select_problem"
     description: str = "Get available problems formatted for LLM selection with competitive analysis"
     args_schema: Type[BaseModel] = SelectProblemInput
     
     def _run(self, contest_id: str, solved_problems: List[str], time_remaining: int) -> str:
-        """Format available problems for LLM selection."""
         contest = self.client.get_contest(contest_id)
         if not contest:
             return "Contest not found."
@@ -227,21 +222,17 @@ This problem appears to be a straightforward implementation problem that can be 
 
 
 class CheckSubmissionResultsInput(BaseModel):
-    """Input for checking submission results."""
     contest_id: str = Field(description="The ID of the contest")
     participant_id: str = Field(description="The ID of the participant")
     problem_id: str = Field(description="The ID of the problem")
 
 
 class CheckSubmissionResultsTool(ContestTool):
-    """Tool to check the latest submission result for a specific problem."""
-    
     name: str = "check_submission_results"
     description: str = "Check the status and verdict of the latest submission for a problem"
     args_schema: Type[BaseModel] = CheckSubmissionResultsInput
     
     def _run(self, contest_id: str, participant_id: str, problem_id: str) -> str:
-        """Check submission results."""
         submissions = self.client.get_submissions(contest_id, participant_id, problem_id)
         
         if not submissions:
@@ -255,7 +246,6 @@ class CheckSubmissionResultsTool(ContestTool):
         if latest.verdict_message:
             result_msg += f"Verdict: {latest.verdict_message}\n"
         
-        # Check if solved
         if latest.status.value.upper() == "ACCEPTED" or "ACCEPTED" in latest.status.value.upper():
             result_msg += "🎉 PROBLEM SOLVED! ✅"
         else:

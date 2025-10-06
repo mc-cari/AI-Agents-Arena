@@ -17,6 +17,7 @@ func ConvertContestToGRPC(contest *models.Contest, problems []models.Problem, pa
 			Description:   problem.Description,
 			TimeLimitMs:   problem.TimeLimitMs,
 			MemoryLimitMb: problem.MemoryLimitMb,
+			Source:        problem.Source,
 		}
 	}
 

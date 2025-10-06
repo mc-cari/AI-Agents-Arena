@@ -17,6 +17,7 @@ logs:
 
 
 proto:
+	@echo "Generating protobuf files for ContestManager (Go)..."
 	docker run --rm -v $(PWD):/workspace -w /workspace \
 		-e GOPATH=/go \
 		-v $(shell go env GOPATH):/go \
@@ -28,32 +29,36 @@ proto:
 		mkdir -p ContestManager/api/grpc && \
 		protoc --go_out=ContestManager/api/grpc --go_opt=paths=source_relative \
 			--go-grpc_out=ContestManager/api/grpc --go-grpc_opt=paths=source_relative \
-			contest.proto"
+			contest.proto && \
+		mkdir -p ContestManager/api/grpc/agentmanager && \
+		protoc --go_out=ContestManager/api/grpc/agentmanager --go_opt=paths=source_relative \
+			--go-grpc_out=ContestManager/api/grpc/agentmanager --go-grpc_opt=paths=source_relative \
+			agent_manager.proto"
+	@echo "Generating protobuf files for AgentManager (Python)..."
 	docker run --rm -v $(PWD):/workspace -w /workspace \
 		python:3.11-alpine sh -c "\
 		apk add --no-cache protobuf protobuf-dev && \
 		pip install -r AgentManager/requirements.txt && \
 		mkdir -p AgentManager/src/grpc_client && \
-		python -m grpc_tools.protoc --proto_path=. \
-			--python_out=AgentManager/src/grpc_client \
-			--grpc_python_out=AgentManager/src/grpc_client \
-			contest.proto && \
-		touch AgentManager/src/grpc_client/__init__.py"
-
-test:
-	docker compose -f docker-compose.test.yml --profile test up --build --abort-on-container-exit
-	docker compose -f docker-compose.test.yml down -v
+		cd AgentManager/src/grpc_client && \
+		python -m grpc_tools.protoc --proto_path=/workspace \
+			--python_out=. \
+			--grpc_python_out=. \
+			/workspace/contest.proto && \
+		cd /workspace && \
+		mkdir -p AgentManager/src/grpc_server && \
+		cd AgentManager/src/grpc_server && \
+		python -m grpc_tools.protoc --proto_path=/workspace \
+			--python_out=. \
+			--grpc_python_out=. \
+			/workspace/agent_manager.proto && \
+		cd /workspace && \
+		touch AgentManager/src/grpc_client/__init__.py && \
+		touch AgentManager/src/grpc_server/__init__.py"
+	@echo "✅ Protobuf generation complete"
 
 test-contestmanager:
-	docker compose -f docker-compose.test.yml --profile test up --build --abort-on-container-exit integration-test test-worker
-	docker compose -f docker-compose.test.yml down -v
-
-test-agentmanager:
-	docker compose -f docker-compose.test.yml --profile test up --build --abort-on-container-exit contestmanager-test test-worker
-	docker compose -f docker-compose.test.yml down -v
-
-test-worker:
-	docker compose -f docker-compose.test.yml --profile test up --build --abort-on-container-exit test-worker
+	docker compose -f docker-compose.test.yml up --build --abort-on-container-exit integration-test test-worker
 	docker compose -f docker-compose.test.yml down -v
 
 clean:
@@ -63,11 +68,35 @@ clean:
 
 import-problems: PROBLEM_PATH ?= /data/coffee
 import-problems:
+	docker compose --profile import build import-problems
 	docker compose --profile import run --rm import-problems ./import-problems $(PROBLEM_PATH)
 
 delete-problem: PROBLEM_NAME ?= "Make Them Even"
 delete-problem:
-	docker compose --profile delete run --rm delete-problem ./delete-problem $(PROBLEM_NAME)
+	docker compose --profile delete build delete-problem
+	docker compose --profile delete run --rm delete-problem ./delete-problem "$(PROBLEM_NAME)"
+
+run-project:
+	docker compose up --build -d
+
+test-agents: MODELS ?= gpt-4o,gpt-5-mini
+test-agents:
+	@echo "Running multi-agent test with models: $(MODELS)"
+	@mkdir -p $(PWD)/AgentManager/logs
+	docker run --rm \
+		-v $(PWD)/AgentManager:/app \
+		-v $(PWD)/AgentManager/logs:/app/logs \
+		-w /app \
+		--network projects_contest-network \
+		-e CONTEST_MANAGER_HOST=contestmanager:50051 \
+		-e AGENT_MANAGER_HOST=agent-manager:50052 \
+		-e MODELS="$(MODELS)" \
+		python:3.11-alpine sh -c "\
+		pip install -q -r requirements.txt && \
+		python3 test_simple_contest.py"
+	@echo ""
+	@echo "📁 Logs available in: AgentManager/logs/"
+	@ls -lh $(PWD)/AgentManager/logs/ 2>/dev/null || true
 
 contestmanager:
 	@echo "ContestManager commands:"
@@ -80,17 +109,6 @@ agentmanager:
 	@echo "  make -C AgentManager build"
 	@echo "  make -C AgentManager run"
 	@echo "  make -C AgentManager test"
-
-dev-up:
-	docker compose up -d postgres redis
-	@echo "Database services started. You can now run individual services locally."
-
-dev-down:
-	docker compose down postgres redis
-
-workers-up:
-	docker compose up -d worker --scale worker=3
-
 
 db-reset:
 	docker compose down postgres

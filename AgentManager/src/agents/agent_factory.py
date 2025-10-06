@@ -99,7 +99,7 @@ class AgentManager:
                 timeout=kwargs.get("timeout", settings.timeout)
             )
             
-            agent = ContestAgent(config, client, llm)
+            agent = ContestAgent(config, client, llm, contest_id, participant_id)
             
             agent_key = f"{contest_id}_{participant_id}"
             self.active_agents[agent_key] = agent

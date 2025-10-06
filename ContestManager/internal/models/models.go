@@ -83,6 +83,7 @@ type Problem struct {
 	TimeLimitMs   int32      `json:"time_limit_ms" gorm:"not null;default:1000"`
 	MemoryLimitMb int32      `json:"memory_limit_mb" gorm:"not null;default:256"`
 	Tag           ProblemTag `json:"tag" gorm:"type:problem_tag;not null;default:'IMPLEMENTATION'"`
+  Source        string     `json:"source" gorm:"size:255;not null;default:'UNKNOWN'"`
 	CreatedAt     time.Time  `json:"created_at" gorm:"autoCreateTime"`
 	UpdatedAt     time.Time  `json:"updated_at" gorm:"autoUpdateTime"`
 	TestCases     []TestCase `json:"test_cases,omitempty" gorm:"foreignKey:ProblemID;constraint:OnDelete:CASCADE"`

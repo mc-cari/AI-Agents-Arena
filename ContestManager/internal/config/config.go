@@ -8,12 +8,13 @@ import (
 )
 
 type Config struct {
-	Database DatabaseConfig
-	Redis    RedisConfig
-	Server   ServerConfig
-	Contest  ContestConfig
-	Logging  LoggingConfig
-	Worker   WorkerConfig
+	Database     DatabaseConfig
+	Redis        RedisConfig
+	Server       ServerConfig
+	Contest      ContestConfig
+	Logging      LoggingConfig
+	Worker       WorkerConfig
+	AgentManager AgentManagerConfig
 }
 
 type DatabaseConfig struct {
@@ -34,6 +35,7 @@ type RedisConfig struct {
 type ServerConfig struct {
 	GRPCPort string
 	HTTPPort string
+	Address  string
 }
 
 type ContestConfig struct {
@@ -50,6 +52,10 @@ type WorkerConfig struct {
 	MaxWorkers       int
 	HeartbeatIntervalSeconds int
 	JobTimeoutSeconds       int
+}
+
+type AgentManagerConfig struct {
+	Address string
 }
 
 func LoadConfig() *Config {
@@ -77,6 +83,7 @@ func Load() (*Config, error) {
 		Server: ServerConfig{
 			GRPCPort: getEnv("GRPC_PORT", "50051"),
 			HTTPPort: getEnv("HTTP_PORT", "8080"),
+			Address:  getEnv("SERVER_ADDRESS", "contest-manager:50051"),
 		},
 		Contest: ContestConfig{
 			MaxConcurrentContests: getEnvAsInt("MAX_CONCURRENT_CONTESTS", 3),
@@ -90,6 +97,9 @@ func Load() (*Config, error) {
 			MaxWorkers:               getEnvAsInt("MAX_WORKERS", 3),
 			HeartbeatIntervalSeconds: getEnvAsInt("WORKER_HEARTBEAT_INTERVAL", 15),
 			JobTimeoutSeconds:        getEnvAsInt("WORKER_JOB_TIMEOUT", 300),
+		},
+		AgentManager: AgentManagerConfig{
+			Address: getEnv("AGENT_MANAGER_ADDRESS", "agent-manager:50052"),
 		},
 	}
 

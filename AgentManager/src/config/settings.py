@@ -3,7 +3,6 @@ from typing import Optional
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
-
 class Settings(BaseModel):
     
     temperature: float
@@ -13,6 +12,11 @@ class Settings(BaseModel):
     openai_api_key: Optional[str] = None
     anthropic_api_key: Optional[str] = None
     google_api_key: Optional[str] = None
+    
+    langsmith_api_key: Optional[str] = None
+    langsmith_project: str = "contest-agent"
+    langsmith_endpoint: str = "https://api.smith.langchain.com"
+    langsmith_tracing_v2: bool = True
     
     contest_id: Optional[str] = None
     participant_id: Optional[str] = None
@@ -38,6 +42,11 @@ class Settings(BaseModel):
             'anthropic_api_key': os.getenv('ANTHROPIC_API_KEY'),
             'google_api_key': os.getenv('GOOGLE_API_KEY'),
             
+            'langsmith_api_key': os.getenv('LANGSMITH_API_KEY'),
+            'langsmith_project': os.getenv('LANGSMITH_PROJECT', 'contest-agent'),
+            'langsmith_endpoint': os.getenv('LANGSMITH_ENDPOINT', 'https://api.smith.langchain.com'),
+            'langsmith_tracing_v2': os.getenv('LANGSMITH_TRACING_V2', 'true').lower() == 'true',
+            
             'contest_id': os.getenv('CONTEST_ID'),
             'participant_id': os.getenv('PARTICIPANT_ID'),
             
@@ -57,9 +66,7 @@ class Settings(BaseModel):
         
         super().__init__(**env_data)
 
-
 _settings: Optional[Settings] = None
-
 
 def get_settings() -> Settings:
     global _settings

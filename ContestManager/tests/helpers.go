@@ -270,24 +270,33 @@ func (env *TestEnvironment) CreateSampleProblem(t *testing.T, problemKey string)
 func (env *TestEnvironment) CreateSampleContest(t *testing.T, problemID uuid.UUID) *models.Contest {
 	ctx := context.Background()
 
-	contestID := uuid.New()
-	startTime := time.Now()
-	duration := 5 * time.Minute
-	endTime := startTime.Add(duration)
+	contestService := services.NewContestService(
+		env.ContestRepo,
+		env.ProblemRepo,
+		env.ParticipantRepo,
+		env.SubmissionRepo,
+		env.ProblemResultRepo,
+		env.TestCaseRepo,
+		env.Coordinator,
+		&config.Config{
+			Contest: config.ContestConfig{
+				DurationSeconds: 300, 
+			},
+		},
+	)
 
-	contest := &models.Contest{
-		ID:          contestID,
-		State:       models.ContestStateRunning,
-		StartedAt:   startTime,
-		EndsAt:      endTime,
-		NumProblems: 1,
+	req := &grpcpb.CreateContestWithProblemsRequest{
+		ProblemIds:        []string{problemID.String()},
+		ParticipantModels: []string{"test-participant-1", "test-participant-2"},
 	}
 
-	err := env.ContestRepo.CreateContest(ctx, contest)
-	require.NoError(t, err, "Failed to create sample contest")
+	resp, err := contestService.CreateContestWithProblems(ctx, req)
+	require.NoError(t, err, "Failed to create contest via service")
+	require.NotNil(t, resp, "Contest response should not be nil")
 
-	err = env.ProblemRepo.AddProblemToContest(ctx, contestID, problemID)
-	require.NoError(t, err, "Failed to add problem to contest")
+	contest, err := env.ContestRepo.GetContest(ctx, uuid.MustParse(resp.Contest.Id))
+	require.NoError(t, err, "Failed to get created contest")
+	require.NotNil(t, contest, "Created contest should not be nil")
 
 	return contest
 }
@@ -472,6 +481,19 @@ if __name__ == "__main__":
 
 if __name__ == "__main__":
     print(solve())`,
+		"cpp_tle": `#include <iostream>
+#include <chrono>
+#include <thread>
+using namespace std;
+
+int main() {
+    int a, b;
+    cin >> a >> b;
+    // Sleep long enough to exceed the 1s limit
+    this_thread::sleep_for(chrono::seconds(5));
+    cout << a + b << endl;
+    return 0;
+}`,
 	},
 	"coffee": {
 		"cpp_correct": `#include <iostream>

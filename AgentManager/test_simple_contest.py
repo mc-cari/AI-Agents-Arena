@@ -8,21 +8,22 @@ from typing import Optional
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
 from src.grpc_client import ContestManagerClient
-from src.agents import AgentManager
 from src.config import get_settings
 
-MODEL = "gpt-5-mini"  
+MODELS_STR = os.getenv("MODELS", "gpt-5-mini")
+MODELS = [m.strip() for m in MODELS_STR.split(",")]
+CONTEST_MANAGER_HOST = os.getenv("CONTEST_MANAGER_HOST", "localhost:50051")  
 
 def create_test_contest(client: ContestManagerClient) -> Optional[str]:
     print("Creating new contest...")
     
     try:
-        participant_models = [MODEL]
+        participant_models = MODELS
         print(f"   - Requesting contest with {len(participant_models)} participants: {participant_models}")
-        print(f"   - Requesting {2} problems")
+        print(f"   - Requesting {3} problems")
         
         contest = client.create_contest(
-            num_problems=2,
+            num_problems=3,
             participant_models=participant_models
         )
         
@@ -50,7 +51,7 @@ async def create_contest_and_agent():
     print("=" * 50)
     
     print("1. Connecting to ContestManager server...")
-    client = ContestManagerClient("localhost:50051")
+    client = ContestManagerClient(CONTEST_MANAGER_HOST)
     
     try:
         client.connect()
@@ -65,7 +66,7 @@ async def create_contest_and_agent():
             
     except Exception as e:
         print(f"❌ Failed to connect to ContestManager: {e}")
-        print("Make sure ContestManager is running on localhost:50051")
+        print(f"Make sure ContestManager is running on {CONTEST_MANAGER_HOST}")
         return False
     
     print("\n2. Setting up contest...")
@@ -75,115 +76,58 @@ async def create_contest_and_agent():
     if not contest:
         raise Exception("Failed to create contest")
     
-    participant_id = contest.participants[0].id if contest.participants else None
-    print(f"Participant ID: {participant_id}")
+    # Map models to participant IDs
+    participant_map = {}
+    for i, model in enumerate(MODELS):
+        if i < len(contest.participants):
+            participant_map[model] = contest.participants[i].id
+        else:
+            print(f"⚠️  No participant found for model {model}")
     
-    if not participant_id:
+    print(f"\n📋 Participant mapping:")
+    for model, pid in participant_map.items():
+        print(f"   {model} → {pid}")
+    
+    if not participant_map:
         print("❌ No participants found in contest")
         client.disconnect()
         return False
     
-    print("\n3. Checking participant registration...")
+    print("\n3. Verifying participants registered...")
     try:
         leaderboard = client.get_leaderboard(contest.id)
-        existing_participant = any(p.id == participant_id for p in leaderboard)
-        
-        if existing_participant:
-            print(f"✅ Participant {participant_id} already registered")
-        else:
-            print(f"⚠️  Participant {participant_id} not found in contest")
-            print("   In a real scenario, you would register the participant via API")
-            print("   For testing, we'll proceed anyway")
+        print(f"✅ {len(leaderboard)} participants registered in contest")
     except Exception as e:
         print(f"⚠️  Could not check leaderboard: {e}")
-        print("   Proceeding with agent creation...")
     
-    print("\n4. Initializing AI Agent...")
+    print("\n4. Agents automatically created by ContestManager...")
+    print(f"   ℹ️  ContestManager automatically creates agents for all participants")
+    print(f"   ℹ️  {len(participant_map)} agents should be running for this contest")
+    
+
+    await asyncio.sleep(120)
+    
+    print("\n5. Final leaderboard...")
     
     try:
-        print(f"✅ Config loaded - Model: {MODEL}")
-
-        agent_manager = AgentManager()
-        print("✅ AgentManager created")
-        
-        contest_id = contest.id if contest else "default_contest"
-        if not participant_id:
-            print("⚠️  No participant ID available, using default")
-            participant_id = "default_participant"
-        
-        print(f"   - Contest ID: {contest_id}")
-        print(f"   - Participant ID: {participant_id}")
-        
-        agent = agent_manager.create_agent_from_model(
-            MODEL,
-            client,
-            contest_id,
-            participant_id
-        )
-        
-        print(f"   - Contest tools: {len(agent.contest_tools)}")
-        print(f"   - Coding tools: {len(agent.coding_tools)}")
-        print(f"   - Total tools: {len(agent.all_tools)}")
-        
+        leaderboard = client.get_leaderboard(contest.id)
+        print("🏆 Final Leaderboard:")
+        for rank, participant in enumerate(leaderboard, 1):
+            print(f"{rank}. {participant.model_name}")
+            print(f"   Solved: {participant.result.solved}")
+            print(f"   Penalty: {participant.result.total_penalty_seconds}s")
     except Exception as e:
-        print(f"❌ Failed to create AI agent: {e}")
-        import traceback
-        print("Full error traceback:")
-        traceback.print_exc()
-        client.disconnect()
-        return False
-
-    print("\n5. Testing basic agent operations...")
+        print(f"⚠️  Could not fetch final leaderboard: {e}")
     
-    try:
-        view_contest_tool = next(t for t in agent.contest_tools if t.name == "view_contest")
-        contest_info = view_contest_tool.run({"contest_id": contest.id if contest else "default_contest"})
-        print("✅ Contest tool execution successful")
-        
-        # Test leaderboard
-        leaderboard_tool = next(t for t in agent.contest_tools if t.name == "view_leaderboard")
-        leaderboard_info = leaderboard_tool.run({"contest_id": contest.id if contest else "default_contest"})
-        print("✅ Leaderboard tool execution successful")
-        
-        # Test problem viewing if problems exist
-        if contest.problems:
-            problem_tool = next(t for t in agent.contest_tools if t.name == "view_problem")
-            problem_info = problem_tool.run({
-                "contest_id": contest.id if contest else "default_contest",
-                "problem_id": contest.problems[0].id
-            })
-            print(f"✅ Problem tool execution successful")
-            print(f"   First problem: {contest.problems[0].name}")
-        
-    except Exception as e:
-        print(f"⚠️  Some agent operations failed: {e}")
-    
-    print("\n6. Contest simulation...")
-    print("🎯 Agent is ready to participate in the contest!")
-    
-    if contest.problems:
-        print(f"Available problems:")
-        for i, problem in enumerate(contest.problems[:3], 1):  # Show first 3
-            print(f"   {i}. {problem.name} ({problem.id})")
-        
-        print("\n💡 To run the full AI agent contest workflow:")
-        print(f"   python3 -m src.main --contest-id {contest.id if contest else 'default_contest'} --participant-id {participant_id} --model {MODEL}")
-    
-    print("\n7. Cleanup...")
+    print("\n6. Cleanup...")
     client.disconnect()
     print("✅ Disconnected from ContestManager")
     
-    print("\n🎉 Contest and AI Agent setup completed successfully!")
+    print("\n🎉 Contest and AI Agent test completed successfully!")
     return True
 
 
 async def main():
-    """Main function to run the test."""
-    
-
-    print("Checking prerequisites...")
-
-
     success = await create_contest_and_agent()
 
     return success

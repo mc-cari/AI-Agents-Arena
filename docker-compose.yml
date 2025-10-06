@@ -55,6 +55,8 @@ services:
       MAX_TOKENS_PER_CONTEST: ${MAX_TOKENS_PER_CONTEST:-200000}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       GORM_LOG_LEVEL: ${GORM_LOG_LEVEL:-error}
+      AGENT_MANAGER_ADDRESS: ${AGENT_MANAGER_ADDRESS:-agent-manager:50052}
+      SERVER_ADDRESS: ${SERVER_ADDRESS:-contestmanager:50051}
     depends_on:
       postgres:
         condition: service_healthy
@@ -69,6 +71,8 @@ services:
       context: ./AgentManager
       dockerfile: Dockerfile
     container_name: agent-manager
+    ports:
+      - "50052:50052"
     environment:
       - CONTEST_MANAGER_HOST=contestmanager:50051
       - TEMPERATURE=${TEMPERATURE:-0.1}
@@ -77,23 +81,19 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
-      - CONTEST_ID=${CONTEST_ID:-default-contest}
-      - PARTICIPANT_ID=${PARTICIPANT_ID:-default-participant}
+      - LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
+      - LANGSMITH_PROJECT=${LANGSMITH_PROJECT:-contest-agent}
+      - LANGSMITH_ENDPOINT=${LANGSMITH_ENDPOINT:-https://api.smith.langchain.com}
+      - LANGSMITH_TRACING_V2=${LANGSMITH_TRACING_V2:-true}
       - MAX_CONCURRENT_AGENTS=${MAX_CONCURRENT_AGENTS:-10}
       - AGENT_TIMEOUT=${AGENT_TIMEOUT:-300.0}
       - AGENT_LOG_LEVEL=${AGENT_LOG_LEVEL:-INFO}
       - LOG_FORMAT=${LOG_FORMAT:-%(asctime)s - %(name)s - %(levelname)s - %(message)s}
-    command: >
-      python -m src.main 
-      --contest-id ${CONTEST_ID:-default-contest} 
-      --participant-id ${PARTICIPANT_ID:-default-participant}
-      --host ${CONTEST_MANAGER_HOST:-contestmanager:50051}
+    command: python -m src.main --port 50052 --max-workers ${MAX_CONCURRENT_AGENTS:-10} --log-level ${AGENT_LOG_LEVEL:-INFO}
     depends_on:
       - contestmanager
     networks:
       - contest-network
-    profiles:
-      - agent
 
   worker:
     build: 

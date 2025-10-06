@@ -27,7 +27,6 @@ func NewDirectExecutor() *DirectExecutor {
 func (de *DirectExecutor) Execute(ctx context.Context, req *models.ExecutionRequest) (*models.ExecutionResult, error) {
 	results, err := de.ExecuteCode(ctx, req)
 	if err != nil {
-		// Check if this is a compilation error
 		if strings.Contains(err.Error(), "compilation failed") {
 			return &models.ExecutionResult{
 				JobID:           req.JobID,
@@ -80,7 +79,6 @@ func (de *DirectExecutor) Execute(ctx context.Context, req *models.ExecutionRequ
 }
 
 func (de *DirectExecutor) ExecuteCode(ctx context.Context, req *models.ExecutionRequest) ([]models.TestCaseResult, error) {
-	// Create a unique directory for this execution
 	execDir := filepath.Join(de.baseDir, fmt.Sprintf("exec-%d", time.Now().UnixNano()))
 	if err := os.MkdirAll(execDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create execution directory: %w", err)
@@ -106,15 +104,12 @@ func (de *DirectExecutor) ExecuteCode(ctx context.Context, req *models.Execution
 	return results, nil
 }
 
-// executeCpp compiles and executes C++ code
 func (de *DirectExecutor) executeCpp(ctx context.Context, req *models.ExecutionRequest, execDir string) ([]models.TestCaseResult, error) {
-	// Write source code to file
 	sourceFile := filepath.Join(execDir, "solution.cpp")
 	if err := os.WriteFile(sourceFile, []byte(req.Code), 0644); err != nil {
 		return nil, fmt.Errorf("failed to write source file: %w", err)
 	}
 
-	// Compile C++ code
 	compiledFile := filepath.Join(execDir, "solution")
 	compileCmd := exec.CommandContext(ctx, "g++", "-std=c++20", "-O2", "-o", compiledFile, sourceFile)
 	compileCmd.Dir = execDir
@@ -124,7 +119,6 @@ func (de *DirectExecutor) executeCpp(ctx context.Context, req *models.ExecutionR
 		return nil, fmt.Errorf("compilation failed: %s", string(compileOutput))
 	}
 
-	// Execute test cases
 	var results []models.TestCaseResult
 	for _, testCase := range req.TestCases {
 		result, err := de.executeTestCase(ctx, req, testCase, compiledFile, execDir)
@@ -132,20 +126,20 @@ func (de *DirectExecutor) executeCpp(ctx context.Context, req *models.ExecutionR
 			return nil, fmt.Errorf("failed to execute test case %d: %w", testCase.TestOrder, err)
 		}
 		results = append(results, result)
+		if result.Status != models.TestCaseStatusPassed {
+			break
+		}
 	}
 
 	return results, nil
 }
 
-// executePython executes Python code
 func (de *DirectExecutor) executePython(ctx context.Context, req *models.ExecutionRequest, execDir string) ([]models.TestCaseResult, error) {
-	// Write source code to file
 	sourceFile := filepath.Join(execDir, "solution.py")
 	if err := os.WriteFile(sourceFile, []byte(req.Code), 0644); err != nil {
 		return nil, fmt.Errorf("failed to write source file: %w", err)
 	}
 
-	// Execute test cases
 	var results []models.TestCaseResult
 	for _, testCase := range req.TestCases {
 		result, err := de.executeTestCase(ctx, req, testCase, "python3", execDir, sourceFile)
@@ -153,28 +147,27 @@ func (de *DirectExecutor) executePython(ctx context.Context, req *models.Executi
 			return nil, fmt.Errorf("failed to execute test case %d: %w", testCase.TestOrder, err)
 		}
 		results = append(results, result)
+
+		if result.Status != models.TestCaseStatusPassed {
+			break
+		}
 	}
 
 	return results, nil
 }
 
-// executeTestCase executes a single test case
 func (de *DirectExecutor) executeTestCase(ctx context.Context, req *models.ExecutionRequest, testCase models.TestCaseData, executable string, execDir string, args ...string) (models.TestCaseResult, error) {
-	// Create timeout context
 	timeout := time.Duration(req.TimeLimitMs) * time.Millisecond
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	// Create command
 	cmd := exec.CommandContext(timeoutCtx, executable, args...)
 	cmd.Dir = execDir
 
-	// Set up input/output pipes
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return models.TestCaseResult{}, fmt.Errorf("failed to create stdin pipe: %w", err)
 	}
-	defer stdin.Close()
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
@@ -188,23 +181,19 @@ func (de *DirectExecutor) executeTestCase(ctx context.Context, req *models.Execu
 	}
 	defer stderr.Close()
 
-	// Start the process
 	startTime := time.Now()
 	if err := cmd.Start(); err != nil {
 		return models.TestCaseResult{}, fmt.Errorf("failed to start process: %w", err)
 	}
 
-	// Send input to stdin
 	go func() {
 		defer stdin.Close()
 		io.WriteString(stdin, testCase.Input)
 	}()
 
-	// Read output
 	var output strings.Builder
 	var stderrOutput strings.Builder
 	
-	// Read stdout and stderr concurrently
 	outputDone := make(chan error, 1)
 	stderrDone := make(chan error, 1)
 	
@@ -218,7 +207,6 @@ func (de *DirectExecutor) executeTestCase(ctx context.Context, req *models.Execu
 		stderrDone <- err
 	}()
 
-	// Wait for process completion or timeout
 	processDone := make(chan error, 1)
 	go func() {
 		processDone <- cmd.Wait()
@@ -239,22 +227,18 @@ func (de *DirectExecutor) executeTestCase(ctx context.Context, req *models.Execu
 		}
 	case <-timeoutCtx.Done():
 		timedOut = true
-		// Kill the process
 		if cmd.Process != nil {
 			cmd.Process.Kill()
 		}
-		// Wait for process to actually terminate
 		<-processDone
 	}
 
-	// Wait for output reading to complete
 	<-outputDone
 	<-stderrDone
 
 	execTime := time.Since(startTime)
 	actualTimeMs := int32(execTime.Milliseconds())
 
-	// Check for timeout
 	if timedOut {
 		return models.TestCaseResult{
 			TestOrder:       testCase.TestOrder,
@@ -264,7 +248,6 @@ func (de *DirectExecutor) executeTestCase(ctx context.Context, req *models.Execu
 		}, nil
 	}
 
-	// Check for runtime error
 	if exitCode != 0 {
 		return models.TestCaseResult{
 			TestOrder:       testCase.TestOrder,
@@ -276,7 +259,6 @@ func (de *DirectExecutor) executeTestCase(ctx context.Context, req *models.Execu
 			ErrorMessage:    fmt.Sprintf("Process exited with code %d. Stderr: %s", exitCode, stderrOutput.String()),
 		}, nil
 	}
-
 
 	status := models.TestCaseStatusPassed
 	actualOutput := strings.TrimSpace(output.String())
@@ -293,7 +275,6 @@ func (de *DirectExecutor) executeTestCase(ctx context.Context, req *models.Execu
 	} else {
 		fmt.Printf("Status: Passed\n")
 	}
-	
 
 	return models.TestCaseResult{
 		TestOrder:       testCase.TestOrder,
@@ -305,7 +286,6 @@ func (de *DirectExecutor) executeTestCase(ctx context.Context, req *models.Execu
 	}, nil
 }
 
-// compareOutputIgnoreWhitespace compares outputs ignoring whitespace differences
 func (de *DirectExecutor) compareOutputIgnoreWhitespace(actual, expected string) bool {
 	actualClean := strings.ReplaceAll(strings.ReplaceAll(actual, " ", ""), "\n", "")
 	expectedClean := strings.ReplaceAll(strings.ReplaceAll(expected, " ", ""), "\n", "")

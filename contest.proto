@@ -90,6 +90,7 @@ message Problem {
   int32 time_limit_ms = 4;
   int32 memory_limit_mb = 5;
   ProblemTag tag = 6;
+  string source = 7;
 }
 
 message Participant {
@@ -147,13 +148,7 @@ message CreateContestWithProblemsRequest {
 message CreateContestResponse {
   string contest_id = 1;
   Contest contest = 2;
-}
-
-message GetContestRequest {
-  string contest_id = 1;
-}
-
-message GetContestResponse {
+}963,1
   Contest contest = 1;
 }
 

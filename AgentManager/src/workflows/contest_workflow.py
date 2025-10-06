@@ -5,10 +5,30 @@ from langchain_core.language_models import BaseChatModel
 from datetime import datetime, timedelta
 import logging
 import asyncio
+from pydantic import BaseModel, Field
+from openai import RateLimitError as OpenAIRateLimitError
+from anthropic import RateLimitError as AnthropicRateLimitError
+try:
+    from google.api_core.exceptions import ResourceExhausted as GoogleRateLimitError
+except ImportError:
+    GoogleRateLimitError = None
 
 from ..models import Contest, Problem, AgentConfig
 from ..grpc_client import ContestManagerClient
-from ..tools import create_contest_tools, create_coding_tools
+from ..tools import create_contest_tools
+from ..config.langsmith_config import create_contest_tracer, log_contest_event
+
+
+class CodeSolution(BaseModel):
+    language: str = Field(description="Programming language (python or cpp)")
+    code: str = Field(description="The complete solution code")
+
+
+class ProblemAnalysis(BaseModel):
+    problem_understanding: str = Field(description="Understanding of the problem")
+    approach: str = Field(description="Proposed solution approach")
+    edge_cases: List[str] = Field(description="Important edge cases to consider")
+    confidence: int = Field(description="Confidence level 1-10", ge=1, le=10)
 
 
 class AgentState(TypedDict):
@@ -23,22 +43,133 @@ class AgentState(TypedDict):
     current_step: str
     error_message: Optional[str]
 
+    solution: Optional[CodeSolution]
+    extracted_code: Optional[str]
+    solution_language: Optional[str]
+
 
 class ContestAgent:
 
-    def __init__(self, config: AgentConfig, client: ContestManagerClient, llm: BaseChatModel):
+    def __init__(self, config: AgentConfig, client: ContestManagerClient, llm: BaseChatModel, 
+                 contest_id: str = None, participant_id: str = None):
         self.config = config
         self.client = client
         self.llm = llm
         self.logger = logging.getLogger(__name__)
+        self.contest_id = contest_id
+        self.participant_id = participant_id
+        
+        self.tracer = create_contest_tracer(contest_id or "unknown", participant_id or "unknown")
         
         self.contest_tools = create_contest_tools(client)
-        self.coding_tools = create_coding_tools()
-        self.all_tools = self.contest_tools + self.coding_tools
+        self.all_tools = self.contest_tools
         
+        callbacks = [self.tracer] if self.tracer else []
         self.llm_with_tools = llm.bind_tools(self.all_tools)
         
         self.workflow = self._create_workflow()
+        
+        if contest_id and participant_id:
+            log_contest_event(
+                "agent_created", 
+                contest_id, 
+                participant_id,
+                data={"model": config.model_name, "provider": config.model_provider}
+            )
+    
+    def _handle_contest_end_error(self, state: AgentState, error_msg: str, context: str = "operation") -> bool:
+        """
+        Check if error indicates contest has ended and update state accordingly.
+        
+        Args:
+            state: Current agent state
+            error_msg: Error message to check
+            context: Context where error occurred (e.g., "submission", "check_results")
+            
+        Returns:
+            True if contest ended, False otherwise
+        """
+        contest_end_indicators = [
+            "contest is not accepting submissions",
+            "contest has ended",
+            "contest is finished",
+            "contest not found"
+        ]
+        
+        if any(indicator in error_msg.lower() for indicator in contest_end_indicators):
+            self.logger.warning(f"Contest has ended during {context}, stopping agent")
+            state["current_step"] = "contest_ended"
+            state["error_message"] = "Contest ended"
+            
+            log_contest_event(
+                f"contest_ended_during_{context}",
+                state["contest_id"],
+                state["participant_id"],
+                data={
+                    "submitted_problems": len(state["submitted_problems"]),
+                    "solved_problems": len(state.get("solved_problems", [])),
+                    "attempted_problem": state["current_problem"].id if state.get("current_problem") else None,
+                    "error_message": error_msg
+                }
+            )
+            return True
+        
+        return False
+    
+    async def _invoke_llm_with_backoff(self, llm_instance, messages, max_retries=5):
+        base_delay = 1  
+        max_delay = 60 
+        
+        rate_limit_exceptions = (OpenAIRateLimitError, AnthropicRateLimitError)
+        if GoogleRateLimitError is not None:
+            rate_limit_exceptions = rate_limit_exceptions + (GoogleRateLimitError,)
+        
+        for attempt in range(max_retries):
+            try:
+                response = await llm_instance.ainvoke(messages)
+                
+                if hasattr(response, 'response_metadata') and 'token_usage' in response.response_metadata:
+                    usage = response.response_metadata['token_usage']
+                    self.logger.debug(f"Token usage - Prompt: {usage.get('prompt_tokens', 0)}, "
+                                    f"Completion: {usage.get('completion_tokens', 0)}, "
+                                    f"Total: {usage.get('total_tokens', 0)}")
+                
+                return response
+                
+            except rate_limit_exceptions as e:
+                if attempt == max_retries - 1:
+                    self.logger.error(f"Rate limit error after {max_retries} attempts: {e}")
+                    raise
+                
+                delay = min(base_delay * (2 ** attempt), max_delay)
+                
+                provider = "unknown"
+                if isinstance(e, OpenAIRateLimitError):
+                    provider = "OpenAI"
+                elif isinstance(e, AnthropicRateLimitError):
+                    provider = "Anthropic"
+                elif GoogleRateLimitError and isinstance(e, GoogleRateLimitError):
+                    provider = "Google Gemini"
+                
+                self.logger.warning(f"{provider} rate limit hit (attempt {attempt + 1}/{max_retries}). "
+                                  f"Retrying in {delay:.1f} seconds...")
+                
+                log_contest_event(
+                    "rate_limit_hit",
+                    self.contest_id,
+                    self.participant_id,
+                    data={
+                        "attempt": attempt + 1,
+                        "delay": delay,
+                        "model": self.config.model_name,
+                        "provider": provider
+                    }
+                )
+                
+                await asyncio.sleep(delay)
+            except Exception as e:
+                self.logger.error(f"LLM invocation error: {e}")
+                raise
     
     def _create_workflow(self) -> StateGraph:
         workflow = StateGraph(AgentState)
@@ -96,6 +227,17 @@ class ContestAgent:
             remaining = (contest.ends_at - now).total_seconds()
             state["remaining_time"] = max(0, int(remaining))
             
+            log_contest_event(
+                "contest_analyzed",
+                state["contest_id"],
+                state["participant_id"],
+                data={
+                    "remaining_time": state["remaining_time"],
+                    "num_problems": len(contest.problems),
+                    "num_participants": len(contest.participants)
+                }
+            )
+            
             analysis_prompt = f"""
             Contest Analysis (using tools):
             {contest_info}
@@ -149,7 +291,7 @@ class ContestAgent:
             
             state["messages"].append(HumanMessage(content=full_prompt))
             
-            response = await self.llm.ainvoke(state["messages"])
+            response = await self._invoke_llm_with_backoff(self.llm, state["messages"])
             state["messages"].append(response)
             
             response_text = response.content.strip()
@@ -202,86 +344,69 @@ class ContestAgent:
         try:
             problem = state["current_problem"]
             
-            solve_prompt = f"""
-            Now solve this problem step by step using the available tools:
+            analysis_prompt = f"""
+            Analyze this competitive programming problem and provide a structured analysis:
             
             Problem: {problem.name}
             Description: {problem.description}
             
-            Available tools to help you:
-            1. analyze_problem - Analyze the problem and suggest approaches
-            2. view_problem - View detailed problem information
-            
-            IMPORTANT: You must provide a COMPLETE, WORKING solution to this problem.
-            
-            Steps to follow:
-            1. First, use analyze_problem to understand the problem requirements
-            2. View the problem details to understand input/output format and constraints
-            3. Develop a complete solution in C++20 (preferably) or Python 3.13
-            4. Your solution must:
-               - Handle the input format correctly
-               - Implement the complete algorithm
-               - Handle edge cases
-               - Output the result in the expected format
-               - Be ready to run without additional modifications
-            
-            Write the complete solution directly in your response.
-            Your solution should be a complete, runnable program that solves the given problem.
-            
-            Format your solution as:
-            
-            ```cpp
-            // Complete solution here
-            ```
-            or
-            ```python
-            # Complete solution here
-            ```
+            Provide your analysis in the following structured format:
+            - problem_understanding: Your understanding of what the problem is asking
+            - approach: Your proposed solution approach/algorithm
+            - edge_cases: List of important edge cases to consider
+            - confidence: Your confidence level (1-10) in solving this problem
             """
             
-            state["messages"].append(HumanMessage(content=solve_prompt))
-            response = await self.llm_with_tools.ainvoke(state["messages"])
-            state["messages"].append(response)
+            analysis_llm = self.llm.with_structured_output(ProblemAnalysis)
+            analysis_response = await self._invoke_llm_with_backoff(analysis_llm, [HumanMessage(content=analysis_prompt)])
             
-            if hasattr(response, 'tool_calls') and response.tool_calls:
-                for tool_call in response.tool_calls:
-                    tool_result = await self._execute_tool(tool_call)
-                    
-                    from langchain_core.messages import ToolMessage
-                    tool_message = ToolMessage(
-                        content=tool_result,
-                        tool_call_id=tool_call["id"]
-                    )
-                    state["messages"].append(tool_message)
-                    
-
-                    solution_prompt = f"""
-                    Based on the problem analysis and your understanding, now provide the COMPLETE solution.
-                    
-                    You must write a complete, working program that:
-                    1. Reads the input correctly
-                    2. Implements the algorithm to solve the problem
-                    3. Outputs the result in the expected format
-                    4. Handles all edge cases mentioned in the problem
-                    
-                    Write your complete solution as a runnable program, not as a template or partial code.
-                    """
-                    
-                    state["messages"].append(HumanMessage(content=solution_prompt))
-                    solution_response = await self.llm.ainvoke(state["messages"])
-                    state["messages"].append(solution_response)
-                    
-                    if solution_response.content:
-                        extracted_code = self._extract_code_from_message(solution_response.content)
-                        if not extracted_code:
-                            retry_prompt = """
-                            I need you to provide the actual code solution, not just an explanation.
-                            Please write the complete, runnable program that solves the problem.
-                            Format it as a code block with ```python or ```cpp.
-                            """
-                            state["messages"].append(HumanMessage(content=retry_prompt))
-                            retry_response = await self.llm.ainvoke(state["messages"])
-                            state["messages"].append(retry_response)
+            self.logger.info(f"Problem analysis - Confidence: {analysis_response.confidence}/10")
+            self.logger.info(f"Approach: {analysis_response.approach}")
+            
+            # Now solve the problem using structured output
+            solve_prompt = f"""
+            Based on your analysis, provide a complete solution to this problem:
+            
+            Problem: {problem.name}
+            Description: {problem.description}
+            
+            Your analysis:
+            - Understanding: {analysis_response.problem_understanding}
+            - Approach: {analysis_response.approach}
+            - Edge cases: {', '.join(analysis_response.edge_cases)}
+            
+            Provide your solution in the following structured format:
+            - language: Choose either "python" or "cpp" (prefer cpp for competitive programming)
+            - code: The complete, runnable solution code
+            
+            The code must be a complete, working program that:
+            1. Reads input correctly
+            2. Implements the algorithm to solve the problem
+            3. Outputs the result in the expected format
+            4. Handles all edge cases
+            """
+            
+            solution_llm = self.llm.with_structured_output(CodeSolution)
+            solution_response = await self._invoke_llm_with_backoff(solution_llm, [HumanMessage(content=solve_prompt)])
+            
+            self.logger.info(f"Generated {solution_response.language} solution")
+            
+            log_contest_event(
+                "problem_solved",
+                state["contest_id"],
+                state["participant_id"],
+                data={
+                    "problem_id": problem.id,
+                    "problem_name": problem.name,
+                    "language": solution_response.language,
+                    "code_length": len(solution_response.code),
+                    "confidence": analysis_response.confidence
+                }
+            )
+            
+            state["solution"] = solution_response
+            state["extracted_code"] = solution_response.code
+            state["solution_language"] = solution_response.language
             
             state["current_step"] = "solve_problem"
             
@@ -295,32 +420,22 @@ class ContestAgent:
         self.logger.info("Submitting solution")
         
         try:
-            code = None
-            for i in range(len(state["messages"]) - 1, max(-1, len(state["messages"]) - 10), -1):
-                if i < 0:
-                    break
-                message = state["messages"][i]
-                if hasattr(message, 'content') and message.content:
-                    self.logger.info(f"Checking message {i} for code...")
-                    extracted_code = self._extract_code_from_message(message.content)
-                    if extracted_code:
-                        code = extracted_code
-                        self.logger.info(f"Found code in message {i}")
-                        self.logger.info(f"Code preview: {extracted_code[:200]}...")
-                        break
+            if "solution" in state and state["solution"]:
+                solution = state["solution"]
+                code = solution.code
+                language = solution.language
+                
+                self.logger.info(f"Using structured solution - Language: {language}")
+                self.logger.info(f"Code length: {len(code)} characters")
+                
+            elif "extracted_code" in state and state["extracted_code"]:
+                code = state["extracted_code"]
+                language = state.get("solution_language", "cpp") 
+                
+                self.logger.info(f"Using extracted code - Language: {language}")
+                self.logger.info(f"Code length: {len(code)} characters")
             
             if code:
-                if any(keyword in code.lower() for keyword in ['def ', 'import ', 'if __name__', 'print(']):
-                    language = "python"
-                elif any(keyword in code.lower() for keyword in ['#include', 'int main', 'using namespace', 'cout', 'cin']):
-                    language = "cpp"
-                else:
-                    language = "python" if "def " in code or "import " in code else "cpp"
-                
-                self.logger.info(f"Detected language: {language}")
-                self.logger.info(f"Code length: {len(code)} characters")
-                self.logger.info(f"Code starts with: {code[:100]}...")
-                
                 submit_tool = next(t for t in self.contest_tools if t.name == "submit_solution")
                 result = submit_tool.run({
                     "contest_id": state["contest_id"],
@@ -334,33 +449,29 @@ class ContestAgent:
                     state["submitted_problems"].append(state["current_problem"].id)
                     state["messages"].append(AIMessage(content=result))
                     self.logger.info(result)
+                    
+                    log_contest_event(
+                        "solution_submitted",
+                        state["contest_id"],
+                        state["participant_id"],
+                        data={
+                            "problem_id": state["current_problem"].id,
+                            "problem_name": state["current_problem"].name,
+                            "language": language,
+                            "code_length": len(code)
+                        }
+                    )
                 else:
                     raise Exception(f"Submit tool failed: {result}")
-            else:
-                self.logger.warning("No code found in recent messages. Last few messages:")
-                for i in range(max(0, len(state["messages"]) - 5), len(state["messages"])):
-                    msg = state["messages"][i]
-                    if hasattr(msg, 'content'):
-                        self.logger.warning(f"Message {i}: {msg.content[:300]}...")
-                    else:
-                        self.logger.warning(f"Message {i}: {type(msg)}")
-                
-                self.logger.warning("Attempting to find any code-like content...")
-                for i in range(len(state["messages"]) - 1, max(-1, len(state["messages"]) - 15), -1):
-                    if i < 0:
-                        break
-                    msg = state["messages"][i]
-                    if hasattr(msg, 'content') and msg.content:
-                        if any(keyword in msg.content.lower() for keyword in ['def ', 'import ', '#include', 'int main', 'class ']):
-                            self.logger.warning(f"Found potential code in message {i}: {msg.content[:200]}...")
-                
-                raise Exception("No code found in the solution")
             
             state["current_step"] = "submit_solution"
             
         except Exception as e:
-            self.logger.error(f"Error submitting solution: {e}")
-            state["error_message"] = str(e)
+            error_msg = str(e)
+            self.logger.error(f"Error submitting solution: {error_msg}")
+            
+            if not self._handle_contest_end_error(state, error_msg, "submission"):
+                state["error_message"] = error_msg
         
         return state
     
@@ -398,8 +509,11 @@ class ContestAgent:
             state["current_step"] = "check_results"
             
         except Exception as e:
-            self.logger.error(f"Error checking results: {e}")
-            state["error_message"] = str(e)
+            error_msg = str(e)
+            self.logger.error(f"Error checking results: {error_msg}")
+            
+            if not self._handle_contest_end_error(state, error_msg, "check_results"):
+                state["error_message"] = error_msg
         
         return state
     
@@ -438,7 +552,12 @@ class ContestAgent:
         return state
     
     def _should_continue(self, state: AgentState) -> str:
+        if state.get("current_step") == "contest_ended":
+            self.logger.info("Contest ended, stopping agent")
+            return "end"
+        
         if state["remaining_time"] <= 20:
+            self.logger.info("Time is running out, stopping agent")
             return "end"
         
         contest = state["contest_info"]
@@ -446,143 +565,49 @@ class ContestAgent:
             self.logger.info(f"All {len(contest.problems)} problems solved! Contest complete!")
             return "end"
         
-        if state["error_message"]:
+        if state["error_message"] and state.get("current_step") != "contest_ended":
             return "select_new"
 
         return "continue"
     
     def _check_time_remaining(self, state: AgentState) -> str:
-        contest = state["contest_info"]
+        try:
+            fresh_contest = self.client.get_contest(state["contest_id"])
+            if not fresh_contest:
+                self.logger.warning("Contest not found, ending agent")
+                return "end"
+            
+            if fresh_contest.state.value == "CONTEST_STATE_FINISHED":
+                self.logger.info("Contest has finished, ending agent")
+                
+                log_contest_event(
+                    "contest_ended",
+                    state["contest_id"],
+                    state["participant_id"],
+                    data={
+                        "submitted_problems": len(state["submitted_problems"]),
+                        "solved_problems": len(state.get("solved_problems", [])),
+                        "final_remaining_time": state["remaining_time"]
+                    }
+                )
+                
+                return "end"
+            
+            state["contest_info"] = fresh_contest
+            contest = fresh_contest
+        except Exception as e:
+            self.logger.error(f"Error checking contest state: {e}")
+            contest = state["contest_info"]
+        
         now = datetime.now()
         remaining = (contest.ends_at - now).total_seconds()
         state["remaining_time"] = max(0, int(remaining))
 
         if state["remaining_time"] <= 20:
+            self.logger.info("Time limit reached, ending agent")
             return "end"
         
         return "continue"
-    
-    def _extract_code_from_message(self, content: str) -> Optional[str]:
-        self.logger.debug(f"Extracting code from message of length {len(content)}")
-        import re
-        
-
-        code_pattern = r'```(?:python|cpp|c\+\+)?\n(.*?)\n```'
-        matches = re.findall(code_pattern, content, re.DOTALL)
-        
-        if matches:
-            code = matches[-1].strip()
-            if len(code) > 20:
-                return code
-        
-        generic_code_pattern = r'```\n(.*?)\n```'
-        generic_matches = re.findall(generic_code_pattern, content, re.DOTALL)
-        
-        if generic_matches:
-            code = generic_matches[-1].strip()
-            if len(code) > 50:
-                return code
-        
-        python_patterns = [
-            r'(?:import\s+.*?\n)*\s*(?:def\s+\w+\s*\([^)]*\)\s*:.*?)(?=\n\S|$)',
-            r'(?:import\s+.*?\n)*\s*(?:class\s+\w+.*?)(?=\n\S|$)',
-            r'(?:import\s+.*?\n)*\s*(?:if\s+__name__\s*==\s*[\'"]__main__[\'"].*?)(?=\n\S|$)'
-        ]
-        
-        for pattern in python_patterns:
-            matches = re.findall(pattern, content, re.DOTALL)
-            if matches:
-                code = matches[-1].strip()
-                if len(code) > 50:
-                    return code
-        
-        cpp_patterns = [
-            r'#include\s+<.*?>\n(?:#include\s+<.*?>\n)*\s*(?:using\s+namespace\s+std;)?\s*(?:int\s+main\s*\([^)]*\)\s*\{.*?\})',
-            r'(?:int|void|string|bool)\s+\w+\s*\([^)]*\)\s*\{.*?\}',
-            r'#include\s+<.*?>\n.*?int\s+main\s*\([^)]*\)\s*\{.*?\}'
-        ]
-        
-        for pattern in cpp_patterns:
-            matches = re.findall(pattern, content, re.DOTALL)
-            if matches:
-                code = matches[-1].strip()
-                if len(code) > 50:
-                    return code
-        
-        code_keywords = ['def ', 'class ', 'import ', '#include', 'int ', 'void ', 'string ', 'bool ', 'main(', 'if __name__', 'print(', 'cout', 'cin', 'return ']
-        lines = content.split('\n')
-        code_lines = []
-        in_code = False
-        code_started = False
-        
-        for line in lines:
-            line_stripped = line.strip()
-            
-            # Check if we're starting a code block
-            if any(keyword in line_stripped for keyword in code_keywords):
-                if not code_started:
-                    code_started = True
-                    in_code = True
-                else:
-                    in_code = True
-            
-            # If we're in code and hit a blank line, check if we should continue
-            if in_code and not line_stripped:
-                # Look ahead to see if more code follows
-                next_non_empty = None
-                for next_line in lines[lines.index(line) + 1:]:
-                    if next_line.strip():
-                        next_non_empty = next_line.strip()
-                        break
-                
-                # If next non-empty line doesn't look like code, stop
-                if next_non_empty and not any(keyword in next_non_empty for keyword in code_keywords):
-                    break
-            
-            if in_code:
-                code_lines.append(line)
-        
-        if code_lines and len('\n'.join(code_lines)) > 50:
-            return '\n'.join(code_lines)
-        
-        potential_code_sections = []
-        current_section = []
-        
-        for line in lines:
-            line_stripped = line.strip()
-            
-            # If line looks like code, add to current section
-            if (any(keyword in line_stripped for keyword in code_keywords) or
-                line_stripped.startswith('#') or
-                line_stripped.startswith('//') or
-                line_stripped.startswith('/*') or
-                line_stripped.startswith('*') or
-                line_stripped.endswith(':') or
-                line_stripped.endswith('{') or
-                line_stripped.endswith('}') or
-                line_stripped.endswith(';') or
-                line_stripped.endswith(')') or
-                line_stripped.endswith(']')):
-                
-                current_section.append(line)
-            elif current_section:
-                # If we have a current section and hit a non-code line, save it
-                if len(current_section) > 2:  # At least 3 lines to be substantial
-                    potential_code_sections.append('\n'.join(current_section))
-                current_section = []
-        
-        # Add the last section if it exists
-        if current_section and len(current_section) > 2:
-            potential_code_sections.append('\n'.join(current_section))
-        
-        # Return the longest potential code section
-        if potential_code_sections:
-            longest_section = max(potential_code_sections, key=len)
-            self.logger.debug(f"Found potential code section of length {len(longest_section)}")
-            return longest_section
-        
-        self.logger.debug("No code found in message")
-        return None
     
     async def _execute_tool(self, tool_call) -> str:
         tool_name = tool_call["name"]

@@ -12,9 +12,7 @@ import contest_pb2_grpc
 
 from ..models import Contest, Problem, Participant, Submission, Language, ContestState, SubmissionStatus, ProblemResult, ParticipantResult, ProblemStatus
 
-
 class ContestManagerClient:
-    """gRPC client for communicating with ContestManager service."""
     
     def __init__(self, host: str = "localhost:50051"):
         self.host = host
@@ -23,7 +21,6 @@ class ContestManagerClient:
         self.logger = logging.getLogger(__name__)
     
     def connect(self):
-        """Establish connection to ContestManager service."""
         try:
             self.channel = grpc.insecure_channel(self.host)
             self.stub = contest_pb2_grpc.ContestServiceStub(self.channel)
@@ -33,13 +30,11 @@ class ContestManagerClient:
             raise
     
     def disconnect(self):
-        """Close connection to ContestManager service."""
         if self.channel:
             self.channel.close()
             self.logger.info("Disconnected from ContestManager")
     
     def create_contest(self, num_problems: int, participant_models: List[str]) -> Optional[Contest]:
-        """Create a new contest with specified problems and participants."""
         try:
             request = contest_pb2.CreateContestRequest(
                 num_problems=num_problems,
@@ -66,7 +61,6 @@ class ContestManagerClient:
             return None
 
     def get_contest(self, contest_id: str) -> Optional[Contest]:
-        """Get contest information by ID."""
         try:
             request = contest_pb2.GetContestRequest(contest_id=contest_id)
             response = self.stub.GetContest(request)
@@ -76,7 +70,6 @@ class ContestManagerClient:
             return None
 
     def list_contests(self, page_size: int = 50, page_token: str = "") -> tuple[List[Contest], str]:
-        """List all contests with pagination."""
         try:
             request = contest_pb2.ListContestsRequest(
                 page_size=page_size,
@@ -91,7 +84,6 @@ class ContestManagerClient:
     
     def submit_solution(self, contest_id: str, participant_id: str, problem_id: str, 
                        code: str, language: Language) -> Optional[Submission]:
-        """Submit a solution to a problem."""
         try:
             lang_enum = contest_pb2.LANGUAGE_PYTHON if language == Language.PYTHON else contest_pb2.LANGUAGE_CPP
             request = contest_pb2.SubmitSolutionRequest(
@@ -109,7 +101,6 @@ class ContestManagerClient:
     
     def get_submissions(self, contest_id: str, participant_id: str, 
                        problem_id: Optional[str] = None) -> List[Submission]:
-        """Get submissions for a participant."""
         try:
             request = contest_pb2.GetSubmissionsRequest(
                 contest_id=contest_id,
@@ -123,7 +114,6 @@ class ContestManagerClient:
             return []
     
     def get_leaderboard(self, contest_id: str) -> List[Participant]:
-        """Get current leaderboard for a contest."""
         try:
             request = contest_pb2.GetLeaderboardRequest(contest_id=contest_id)
             response = self.stub.GetLeaderboard(request)
@@ -133,16 +123,13 @@ class ContestManagerClient:
             return []
     
     def _convert_contest(self, pb_contest) -> Contest:
-        """Convert protobuf Contest to our Contest model."""
-        # Handle ContestState enum correctly
         if pb_contest.state == contest_pb2.CONTEST_STATE_RUNNING:
             state = ContestState.RUNNING
         elif pb_contest.state == contest_pb2.CONTEST_STATE_FINISHED:
             state = ContestState.FINISHED
         else:
-            state = ContestState.RUNNING  # Default
+            state = ContestState.RUNNING
             
-        # Handle optional timestamp fields safely
         started_at = None
         ends_at = None
         
@@ -161,14 +148,10 @@ class ContestManagerClient:
         )
     
     def _convert_problem(self, pb_problem) -> Problem:
-        """Convert protobuf Problem to our Problem model."""
-        # Handle ProblemTag enum correctly
-        tag_name = "IMPLEMENTATION"  # Default
+        tag_name = "IMPLEMENTATION"
         try:
             if hasattr(pb_problem, 'tag'):
-                # Get the enum name from the protobuf
                 tag_name = contest_pb2.ProblemTag.Name(pb_problem.tag)
-                # Remove the PROBLEM_TAG_ prefix if present
                 if tag_name.startswith('PROBLEM_TAG_'):
                     tag_name = tag_name[12:]
         except Exception:
@@ -184,15 +167,12 @@ class ContestManagerClient:
         )
     
     def _convert_participant(self, pb_participant) -> Participant:
-        """Convert protobuf Participant to our Participant model."""
-        # Handle ParticipantResult safely
         result = None
         if hasattr(pb_participant, 'result') and pb_participant.result:
             problem_results = {}
             if hasattr(pb_participant.result, 'problem_results'):
                 for k, v in pb_participant.result.problem_results.items():
-                    # Handle ProblemStatus enum correctly
-                    status = ProblemStatus.NON_TRIED  # Default
+                    status = ProblemStatus.NON_TRIED 
                     try:
                         if hasattr(v, 'status'):
                             status_name = contest_pb2.ProblemStatus.Name(v.status)
@@ -222,17 +202,15 @@ class ContestManagerClient:
         )
     
     def _convert_submission(self, pb_submission) -> Submission:
-        """Convert protobuf Submission to our Submission model."""
-        # Handle Language enum correctly
-        language = Language.PYTHON  # Default
+        language = Language.PYTHON 
         if hasattr(pb_submission, 'language'):
             if pb_submission.language == contest_pb2.LANGUAGE_CPP:
                 language = Language.CPP
             elif pb_submission.language == contest_pb2.LANGUAGE_PYTHON:
                 language = Language.PYTHON
         
-        # Handle SubmissionStatus enum correctly
-        status = SubmissionStatus.PENDING  # Default
+
+        status = SubmissionStatus.PENDING 
         try:
             if hasattr(pb_submission, 'status'):
                 status_name = contest_pb2.SubmissionStatus.Name(pb_submission.status)
@@ -242,7 +220,6 @@ class ContestManagerClient:
         except Exception:
             status = SubmissionStatus.PENDING
         
-        # Handle optional timestamp
         submitted_at = None
         if hasattr(pb_submission, 'submitted_at') and pb_submission.submitted_at:
             submitted_at = datetime.fromtimestamp(pb_submission.submitted_at.seconds)

@@ -58,8 +58,6 @@ services:
       redis-test:
         condition: service_healthy
     restart: "no"
-    profiles:
-      - contestmanager
     networks:
       - test-network
 
@@ -128,6 +126,10 @@ services:
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
+      - LANGSMITH_API_KEY=${LANGSMITH_API_KEY}
+      - LANGSMITH_PROJECT=${LANGSMITH_PROJECT:-contest-agent-test}
+      - LANGSMITH_ENDPOINT=${LANGSMITH_ENDPOINT:-https://api.smith.langchain.com}
+      - LANGSMITH_TRACING_V2=${LANGSMITH_TRACING_V2:-true}
       - CONTEST_ID=${CONTEST_ID}
       - PARTICIPANT_ID=${PARTICIPANT_ID}
       - MAX_CONCURRENT_AGENTS=${MAX_CONCURRENT_AGENTS:-10}
@@ -142,8 +144,6 @@ services:
     depends_on:
       - integration-test
     restart: "no"
-    profiles:
-      - agentmanager
     networks:
       - test-network
 
