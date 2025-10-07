@@ -366,3 +366,7 @@ local/
 Data/
 
 ContestManager/data/
+
+WebApp/src/gen/
+
+*/.env

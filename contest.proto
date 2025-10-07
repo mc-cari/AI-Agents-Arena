@@ -21,6 +21,7 @@ service ContestService {
   rpc GetSubmissions(GetSubmissionsRequest) returns (GetSubmissionsResponse);
   rpc GetLeaderboard(GetLeaderboardRequest) returns (GetLeaderboardResponse);
   rpc StreamLeaderboard(StreamLeaderboardRequest) returns (stream LeaderboardUpdate);
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
 }
 
 enum ContestState {
@@ -148,7 +149,13 @@ message CreateContestWithProblemsRequest {
 message CreateContestResponse {
   string contest_id = 1;
   Contest contest = 2;
-}963,1
+}
+
+message GetContestRequest {
+  string contest_id = 1;
+}
+
+message GetContestResponse {
   Contest contest = 1;
 }
 
@@ -201,4 +208,12 @@ message StreamLeaderboardRequest {
 message LeaderboardUpdate {
   repeated Participant participants = 1;
   google.protobuf.Timestamp updated_at = 2;
+  repeated Submission recent_submissions = 3; 
+}
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+  string status = 1;
+  google.protobuf.Timestamp timestamp = 2;
 }

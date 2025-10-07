@@ -17,6 +17,7 @@ func ConvertContestToGRPC(contest *models.Contest, problems []models.Problem, pa
 			Description:   problem.Description,
 			TimeLimitMs:   problem.TimeLimitMs,
 			MemoryLimitMb: problem.MemoryLimitMb,
+			Tag:           ConvertProblemTagToGRPCEnum(problem.Tag),
 			Source:        problem.Source,
 		}
 	}
@@ -127,6 +128,63 @@ func ConvertSubmissionStatusToGRPC(status models.SubmissionStatus) grpc.Submissi
 		return grpc.SubmissionStatus_SUBMISSION_STATUS_JUDGEMENT_FAILED
 	default:
 		return grpc.SubmissionStatus_SUBMISSION_STATUS_UNSPECIFIED
+	}
+}
+
+func ConvertProblemTagToGRPCEnum(tag models.ProblemTag) grpc.ProblemTag {
+	switch tag {
+	case models.ProblemTagStrings:
+		return grpc.ProblemTag_PROBLEM_TAG_STRINGS
+	case models.ProblemTagGeometry:
+		return grpc.ProblemTag_PROBLEM_TAG_GEOMETRY
+	case models.ProblemTagDynamicProgramming:
+		return grpc.ProblemTag_PROBLEM_TAG_DYNAMIC_PROGRAMMING
+	case models.ProblemTagGraphs:
+		return grpc.ProblemTag_PROBLEM_TAG_GRAPHS
+	case models.ProblemTagGreedy:
+		return grpc.ProblemTag_PROBLEM_TAG_GREEDY
+	case models.ProblemTagMath:
+		return grpc.ProblemTag_PROBLEM_TAG_MATH
+	case models.ProblemTagDataStructures:
+		return grpc.ProblemTag_PROBLEM_TAG_DATA_STRUCTURES
+	case models.ProblemTagSorting:
+		return grpc.ProblemTag_PROBLEM_TAG_SORTING
+	case models.ProblemTagBinarySearch:
+		return grpc.ProblemTag_PROBLEM_TAG_BINARY_SEARCH
+	case models.ProblemTagTwoPointers:
+		return grpc.ProblemTag_PROBLEM_TAG_TWO_POINTERS
+	case models.ProblemTagSlidingWindow:
+		return grpc.ProblemTag_PROBLEM_TAG_SLIDING_WINDOW
+	case models.ProblemTagBacktracking:
+		return grpc.ProblemTag_PROBLEM_TAG_BACKTRACKING
+	case models.ProblemTagBitManipulation:
+		return grpc.ProblemTag_PROBLEM_TAG_BIT_MANIPULATION
+	case models.ProblemTagTree:
+		return grpc.ProblemTag_PROBLEM_TAG_TREE
+	case models.ProblemTagHeap:
+		return grpc.ProblemTag_PROBLEM_TAG_HEAP
+	case models.ProblemTagStack:
+		return grpc.ProblemTag_PROBLEM_TAG_STACK
+	case models.ProblemTagQueue:
+		return grpc.ProblemTag_PROBLEM_TAG_QUEUE
+	case models.ProblemTagHashTable:
+		return grpc.ProblemTag_PROBLEM_TAG_HASH_TABLE
+	case models.ProblemTagArray:
+		return grpc.ProblemTag_PROBLEM_TAG_ARRAY
+	case models.ProblemTagLinkedList:
+		return grpc.ProblemTag_PROBLEM_TAG_LINKED_LIST
+	case models.ProblemTagRecursion:
+		return grpc.ProblemTag_PROBLEM_TAG_RECURSION
+	case models.ProblemTagDivideAndConquer:
+		return grpc.ProblemTag_PROBLEM_TAG_DIVIDE_AND_CONQUER
+	case models.ProblemTagSimulation:
+		return grpc.ProblemTag_PROBLEM_TAG_SIMULATION
+	case models.ProblemTagImplementation:
+		return grpc.ProblemTag_PROBLEM_TAG_IMPLEMENTATION
+	case models.ProblemTagBruteForce:
+		return grpc.ProblemTag_PROBLEM_TAG_BRUTE_FORCE
+	default:
+		return grpc.ProblemTag_PROBLEM_TAG_UNSPECIFIED
 	}
 }
 

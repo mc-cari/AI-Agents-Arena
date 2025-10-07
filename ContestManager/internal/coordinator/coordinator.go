@@ -49,7 +49,14 @@ type ContestInstance struct {
 	submissionChan chan uuid.UUID
 	stopChan       chan struct{}
 
+	agentIDs      map[uuid.UUID]string
+	agentManager  AgentManagerClient
+
 	coordinator *ContestCoordinator
+}
+
+type AgentManagerClient interface {
+	StopAgent(ctx context.Context, agentID, reason string) error
 }
 
 func NewContestCoordinator(
@@ -87,7 +94,7 @@ func NewContestCoordinator(
 	return coordinator
 }
 
-func (c *ContestCoordinator) StartContest(contestID uuid.UUID) error {
+func (c *ContestCoordinator) StartContest(contestID uuid.UUID, agentIDs map[uuid.UUID]string, agentManager AgentManagerClient) error {
 	c.mu.Lock()
 
 	if len(c.activeContests) >= c.maxConcurrentContests {
@@ -108,6 +115,8 @@ func (c *ContestCoordinator) StartContest(contestID uuid.UUID) error {
 		State:          contest.State,
 		submissionChan: make(chan uuid.UUID, 100),
 		stopChan:       make(chan struct{}),
+		agentIDs:       agentIDs,
+		agentManager:   agentManager,
 		coordinator:    c,
 	}
 
@@ -131,23 +140,33 @@ func (c *ContestCoordinator) StartContest(contestID uuid.UUID) error {
 
 func (c *ContestCoordinator) StopContest(contestID uuid.UUID) error {
 	c.mu.Lock()
-	defer c.mu.Unlock()
-
 	instance, exists := c.activeContests[contestID]
 	if !exists {
+		c.mu.Unlock()
 		return fmt.Errorf("contest %s not found", contestID)
+	}
+	c.mu.Unlock()
+
+	if instance.agentManager != nil && len(instance.agentIDs) > 0 {
+		log.Printf("Stopping %d agents for contest %s", len(instance.agentIDs), contestID)
+		ctx := context.Background()
+		for participantID, agentID := range instance.agentIDs {
+			if err := instance.agentManager.StopAgent(ctx, agentID, "Contest ended"); err != nil {
+				log.Printf("Failed to stop agent %s for participant %s: %v", agentID, participantID, err)
+			}
+		}
 	}
 
 	close(instance.stopChan)
-
 
 	if err := c.contestRepo.UpdateContestState(context.Background(), contestID, models.ContestStateFinished); err != nil {
 		log.Printf("Failed to update contest state: %v", err)
 	}
 
+	c.mu.Lock()
 	delete(c.activeContests, contestID)
 	delete(c.leaderboardSubscribers, contestID)
-
+	c.mu.Unlock()
 
 	return nil
 }

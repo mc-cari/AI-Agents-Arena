@@ -1,0 +1,3 @@
+[submodule "WebApp"]
+	path = WebApp
+	url = https://github.com/mc-cari/code-battle-bots.git

@@ -55,6 +55,18 @@ proto:
 		cd /workspace && \
 		touch AgentManager/src/grpc_client/__init__.py && \
 		touch AgentManager/src/grpc_server/__init__.py"
+	@echo "Generating protobuf files for WebApp (TypeScript - Connect-RPC)..."
+	docker run --rm -v $(PWD):/workspace -w /workspace \
+		node:20-alpine sh -c "\
+		apk add --no-cache protobuf protobuf-dev && \
+		npm install -g @bufbuild/protoc-gen-es@^1.10.0 @connectrpc/protoc-gen-connect-es && \
+		mkdir -p WebApp/src/gen && \
+		protoc -I . -I /usr/include \
+			--es_out=WebApp/src/gen \
+			--es_opt=target=ts,import_extension=none \
+			--connect-es_out=WebApp/src/gen \
+			--connect-es_opt=target=ts,import_extension=none \
+			contest.proto"
 	@echo "✅ Protobuf generation complete"
 
 test-contestmanager:

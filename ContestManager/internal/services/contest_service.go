@@ -131,6 +131,7 @@ func (cs *ContestService) CreateContest(ctx context.Context, req *grpc.CreateCon
 		}
 	}
 
+	agentIDs := make(map[uuid.UUID]string)
 	if cs.agentManager != nil {
 		log.Printf("Creating agents for %d participants in contest %s", len(participants), contest.ID)
 		for _, participant := range participants {
@@ -146,6 +147,7 @@ func (cs *ContestService) CreateContest(ctx context.Context, req *grpc.CreateCon
 					participant.ID, participant.ModelName, err)
 				continue
 			}
+			agentIDs[participant.ID] = agentID
 			log.Printf("Successfully created agent %s for participant %s (model: %s)", 
 				agentID, participant.ID, participant.ModelName)
 		}
@@ -153,7 +155,7 @@ func (cs *ContestService) CreateContest(ctx context.Context, req *grpc.CreateCon
 		log.Printf("Agent manager not available, skipping agent creation for contest %s", contest.ID)
 	}
 
-	if err := cs.coordinator.StartContest(contest.ID); err != nil {
+	if err := cs.coordinator.StartContest(contest.ID, agentIDs, cs.agentManager); err != nil {
 		return nil, fmt.Errorf("failed to start contest in coordinator: %w", err)
 	}
 
@@ -245,7 +247,31 @@ func (cs *ContestService) CreateContestWithProblems(ctx context.Context, req *gr
 		}
 	}
 
-	if err := cs.coordinator.StartContest(contest.ID); err != nil {
+	agentIDs := make(map[uuid.UUID]string)
+	if cs.agentManager != nil {
+		log.Printf("Creating agents for %d participants in contest %s", len(participants), contest.ID)
+		for _, participant := range participants {
+			agentID, err := cs.agentManager.CreateAgent(
+				ctx,
+				contest.ID.String(),
+				participant.ID.String(),
+				participant.ModelName,
+				cs.config.Server.Address,
+			)
+			if err != nil {
+				log.Printf("Failed to create agent for participant %s (model: %s): %v", 
+					participant.ID, participant.ModelName, err)
+				continue
+			}
+			agentIDs[participant.ID] = agentID
+			log.Printf("Successfully created agent %s for participant %s (model: %s)", 
+				agentID, participant.ID, participant.ModelName)
+		}
+	} else {
+		log.Printf("Agent manager not available, skipping agent creation for contest %s", contest.ID)
+	}
+
+	if err := cs.coordinator.StartContest(contest.ID, agentIDs, cs.agentManager); err != nil {
 		return nil, fmt.Errorf("failed to start contest in coordinator: %w", err)
 	}
 
@@ -456,8 +482,6 @@ func (s *ContestService) GetSubmissions(ctx context.Context, req *grpc.GetSubmis
 		problemID = &id
 	}
 
-
-	
 	submissions, err := s.submissionRepo.GetSubmissions(
 		ctx,
 		contestID,
@@ -495,9 +519,27 @@ func (s *ContestService) StreamLeaderboard(req *grpc.StreamLeaderboardRequest, s
 			grpcParticipants[i], _ = ConvertParticipantToGRPC(coordParticipant, rank)
 		}
 
+		ctx := stream.Context()
+		submissions, err := s.submissionRepo.GetSubmissions(
+			ctx,
+			&contestID,
+			nil, 
+			nil, 
+			15,  
+			0,   
+		)
+		
+		grpcSubmissions := make([]*grpc.Submission, 0, len(submissions))
+		if err == nil {
+			for i := range submissions {
+				grpcSubmissions = append(grpcSubmissions, ConvertSubmissionToGRPC(&submissions[i]))
+			}
+		}
+
 		grpcUpdate := &grpc.LeaderboardUpdate{
-			Participants: grpcParticipants,
-			UpdatedAt:    timestamppb.New(update.UpdatedAt),
+			Participants:       grpcParticipants,
+			UpdatedAt:          timestamppb.New(update.UpdatedAt),
+			RecentSubmissions:  grpcSubmissions,
 		}
 
 		if err := stream.Send(grpcUpdate); err != nil {
@@ -520,4 +562,11 @@ func (cs *ContestService) getCompleteContestData(ctx context.Context, contestID 
 	}
 
 	return grpcContest, nil
+}
+
+func (s *ContestService) HealthCheck(ctx context.Context, req *grpc.HealthCheckRequest) (*grpc.HealthCheckResponse, error) {
+	return &grpc.HealthCheckResponse{
+		Status:    "healthy",
+		Timestamp: timestamppb.New(time.Now()),
+	}, nil
 }

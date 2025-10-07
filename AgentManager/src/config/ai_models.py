@@ -3,18 +3,18 @@ from typing import Dict, List
 MODEL_REGISTRY: Dict[str, str] = {
     "gpt-4": "openai",
     "gpt-4-turbo": "openai", 
-    "gpt-3.5-turbo": "openai",
     "gpt-4o": "openai",
+    "gpt-4.1": "openai",
     "gpt-5-mini": "openai",
     "gpt-5": "openai",
+    "gpt-5-nano": "openai",
     
     "claude-3-5-sonnet-20241022": "anthropic",
-    "claude-3-haiku-20240307": "anthropic", 
+    "claude-sonnet-4-5-20250929": "anthropic", 
     "claude-3-opus-20240229": "anthropic",
     
-    "gemini-1.5-pro": "google",
-    "gemini-1.5-flash": "google",
-    "gemini-pro": "google",
+    "gemini-2.0-flash": "google",
+    "gemini-2.5-flash": "google",
 }
 
 def get_available_models() -> List[str]:

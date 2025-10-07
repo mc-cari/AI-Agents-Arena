@@ -48,6 +48,23 @@ func (c *AgentManagerClient) CreateAgent(ctx context.Context, contestID, partici
 	return resp.AgentId, nil
 }
 
+func (c *AgentManagerClient) StopAgent(ctx context.Context, agentID, reason string) error {
+	resp, err := c.client.StopAgent(ctx, &agentmanager.StopAgentRequest{
+		AgentId: agentID,
+		Reason:  reason,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to stop agent: %w", err)
+	}
+
+	if !resp.Success {
+		return fmt.Errorf("failed to stop agent: %s", resp.Message)
+	}
+
+	log.Printf("Stopped agent %s: %s", agentID, resp.Message)
+	return nil
+}
+
 func (c *AgentManagerClient) Close() error {
 	if c.conn != nil {
 		return c.conn.Close()

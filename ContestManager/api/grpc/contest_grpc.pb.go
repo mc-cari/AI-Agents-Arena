@@ -27,6 +27,7 @@ const (
 	ContestService_GetSubmissions_FullMethodName            = "/contestmanager.ContestService/GetSubmissions"
 	ContestService_GetLeaderboard_FullMethodName            = "/contestmanager.ContestService/GetLeaderboard"
 	ContestService_StreamLeaderboard_FullMethodName         = "/contestmanager.ContestService/StreamLeaderboard"
+	ContestService_HealthCheck_FullMethodName               = "/contestmanager.ContestService/HealthCheck"
 )
 
 // ContestServiceClient is the client API for ContestService service.
@@ -41,6 +42,7 @@ type ContestServiceClient interface {
 	GetSubmissions(ctx context.Context, in *GetSubmissionsRequest, opts ...grpc.CallOption) (*GetSubmissionsResponse, error)
 	GetLeaderboard(ctx context.Context, in *GetLeaderboardRequest, opts ...grpc.CallOption) (*GetLeaderboardResponse, error)
 	StreamLeaderboard(ctx context.Context, in *StreamLeaderboardRequest, opts ...grpc.CallOption) (ContestService_StreamLeaderboardClient, error)
+	HealthCheck(ctx context.Context, in *HealthCheckRequest, opts ...grpc.CallOption) (*HealthCheckResponse, error)
 }
 
 type contestServiceClient struct {
@@ -146,6 +148,15 @@ func (x *contestServiceStreamLeaderboardClient) Recv() (*LeaderboardUpdate, erro
 	return m, nil
 }
 
+func (c *contestServiceClient) HealthCheck(ctx context.Context, in *HealthCheckRequest, opts ...grpc.CallOption) (*HealthCheckResponse, error) {
+	out := new(HealthCheckResponse)
+	err := c.cc.Invoke(ctx, ContestService_HealthCheck_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ContestServiceServer is the server API for ContestService service.
 // All implementations must embed UnimplementedContestServiceServer
 // for forward compatibility
@@ -158,6 +169,7 @@ type ContestServiceServer interface {
 	GetSubmissions(context.Context, *GetSubmissionsRequest) (*GetSubmissionsResponse, error)
 	GetLeaderboard(context.Context, *GetLeaderboardRequest) (*GetLeaderboardResponse, error)
 	StreamLeaderboard(*StreamLeaderboardRequest, ContestService_StreamLeaderboardServer) error
+	HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error)
 	mustEmbedUnimplementedContestServiceServer()
 }
 
@@ -188,6 +200,9 @@ func (UnimplementedContestServiceServer) GetLeaderboard(context.Context, *GetLea
 }
 func (UnimplementedContestServiceServer) StreamLeaderboard(*StreamLeaderboardRequest, ContestService_StreamLeaderboardServer) error {
 	return status.Errorf(codes.Unimplemented, "method StreamLeaderboard not implemented")
+}
+func (UnimplementedContestServiceServer) HealthCheck(context.Context, *HealthCheckRequest) (*HealthCheckResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HealthCheck not implemented")
 }
 func (UnimplementedContestServiceServer) mustEmbedUnimplementedContestServiceServer() {}
 
@@ -349,6 +364,24 @@ func (x *contestServiceStreamLeaderboardServer) Send(m *LeaderboardUpdate) error
 	return x.ServerStream.SendMsg(m)
 }
 
+func _ContestService_HealthCheck_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HealthCheckRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ContestServiceServer).HealthCheck(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ContestService_HealthCheck_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ContestServiceServer).HealthCheck(ctx, req.(*HealthCheckRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ContestService_ServiceDesc is the grpc.ServiceDesc for ContestService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -383,6 +416,10 @@ var ContestService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetLeaderboard",
 			Handler:    _ContestService_GetLeaderboard_Handler,
+		},
+		{
+			MethodName: "HealthCheck",
+			Handler:    _ContestService_HealthCheck_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

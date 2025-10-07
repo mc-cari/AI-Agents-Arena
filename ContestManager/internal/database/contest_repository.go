@@ -25,7 +25,9 @@ func (r *ContestRepository) GetContest(ctx context.Context, id uuid.UUID) (*mode
 	var contest models.Contest
 	err := r.db.WithContext(ctx).
 		Preload("Problems").
-		Preload("Participants").
+		Preload("Participants", func(db *gorm.DB) *gorm.DB {
+			return db.Order("solved DESC, total_penalty_seconds ASC")
+		}).
 		Preload("Participants.ProblemResults").
 		First(&contest, "id = ?", id).Error
 
@@ -43,7 +45,9 @@ func (r *ContestRepository) ListContests(ctx context.Context, limit, offset int)
 	var contests []models.Contest
 	err := r.db.WithContext(ctx).
 		Preload("Problems").
-		Preload("Participants").
+		Preload("Participants", func(db *gorm.DB) *gorm.DB {
+			return db.Order("solved DESC, total_penalty_seconds ASC")
+		}).
 		Preload("Participants.ProblemResults").
 		Order("created_at DESC").
 		Limit(limit).

@@ -184,7 +184,15 @@ class ContestAgent:
         workflow.add_edge("analyze_contest", "select_problem")
         workflow.add_edge("select_problem", "solve_problem")
         workflow.add_edge("solve_problem", "submit_solution")
-        workflow.add_edge("submit_solution", "check_results")
+        
+        workflow.add_conditional_edges(
+            "submit_solution",
+            lambda state: "end" if state.get("current_step") == "contest_ended" else "check_results",
+            {
+                "check_results": "check_results",
+                "end": END
+            }
+        )
         
         workflow.add_conditional_edges(
             "check_results",
