@@ -15,6 +15,7 @@ services:
       interval: 0.5s
       timeout: 2s
       retries: 3
+    restart: unless-stopped
     networks:
       - contest-network
 
@@ -28,6 +29,7 @@ services:
       interval: 0.5s
       timeout: 2s
       retries: 3
+    restart: unless-stopped
     networks:
       - contest-network
 
@@ -90,6 +92,7 @@ services:
       - AGENT_LOG_LEVEL=${AGENT_LOG_LEVEL:-INFO}
       - LOG_FORMAT=${LOG_FORMAT:-%(asctime)s - %(name)s - %(levelname)s - %(message)s}
     command: python -m src.main --port 50052 --max-workers ${MAX_CONCURRENT_AGENTS:-10} --log-level ${AGENT_LOG_LEVEL:-INFO}
+    restart: unless-stopped
     depends_on:
       - contestmanager
     networks:

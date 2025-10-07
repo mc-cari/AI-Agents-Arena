@@ -14,13 +14,13 @@ RUN go mod download && go mod verify
 
 COPY ContestManager/ .
 
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+RUN CGO_ENABLED=0 GOOS=linux go build \
     -ldflags='-w -s' \
     -o server ./cmd/server && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    CGO_ENABLED=0 GOOS=linux go build \
     -ldflags='-w -s' \
     -o import-problems ./cmd/import-problems && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    CGO_ENABLED=0 GOOS=linux go build \
     -ldflags='-w -s' \
     -o delete-problem ./cmd/delete-problem
 
