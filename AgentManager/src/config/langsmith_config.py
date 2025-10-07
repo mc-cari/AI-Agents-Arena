@@ -14,16 +14,18 @@ logger = logging.getLogger(__name__)
 
 class ContestAgentTracer(LangChainTracer):
     
-    def __init__(self, contest_id: str, participant_id: str, **kwargs):
+    def __init__(self, contest_id: str, participant_id: str, agent_id: str = None, **kwargs):
         super().__init__(**kwargs)
         self.contest_id = contest_id
         self.participant_id = participant_id
+        self.agent_id = agent_id or "unknown"
     
     def _get_run_extra(self, **kwargs) -> dict:
         extra = super()._get_run_extra(**kwargs)
         extra.update({
             "contest_id": self.contest_id,
             "participant_id": self.participant_id,
+            "agent_id": self.agent_id,
             "agent_type": "contest_agent"
         })
         return extra
@@ -61,7 +63,7 @@ def setup_langsmith() -> Optional[ContestAgentTracer]:
         return None
 
 
-def create_contest_tracer(contest_id: str, participant_id: str) -> Optional[ContestAgentTracer]:
+def create_contest_tracer(contest_id: str, participant_id: str, agent_id: str = None) -> Optional[ContestAgentTracer]:
     settings = get_settings()
     
     if not settings.langsmith_api_key or not settings.langsmith_tracing_v2:
@@ -71,10 +73,11 @@ def create_contest_tracer(contest_id: str, participant_id: str) -> Optional[Cont
         tracer = ContestAgentTracer(
             contest_id=contest_id,
             participant_id=participant_id,
+            agent_id=agent_id,
             project_name=settings.langsmith_project
         )
         
-        logger.info(f"Created contest tracer for contest {contest_id}, participant {participant_id}")
+        logger.info(f"Created contest tracer for contest {contest_id}, participant {participant_id}, agent {agent_id}")
         return tracer
         
     except Exception as e:

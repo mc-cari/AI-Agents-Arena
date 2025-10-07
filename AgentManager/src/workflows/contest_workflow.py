@@ -51,15 +51,16 @@ class AgentState(TypedDict):
 class ContestAgent:
 
     def __init__(self, config: AgentConfig, client: ContestManagerClient, llm: BaseChatModel, 
-                 contest_id: str = None, participant_id: str = None):
+                 contest_id: str = None, participant_id: str = None, agent_id: str = None):
         self.config = config
         self.client = client
         self.llm = llm
         self.logger = logging.getLogger(__name__)
         self.contest_id = contest_id
         self.participant_id = participant_id
+        self.agent_id = agent_id or "unknown"
         
-        self.tracer = create_contest_tracer(contest_id or "unknown", participant_id or "unknown")
+        self.tracer = create_contest_tracer(contest_id or "unknown", participant_id or "unknown", agent_id)
         
         self.contest_tools = create_contest_tools(client)
         self.all_tools = self.contest_tools
@@ -182,7 +183,16 @@ class ContestAgent:
         workflow.add_node("monitor_contest", self._monitor_contest)
         
         workflow.add_edge("analyze_contest", "select_problem")
-        workflow.add_edge("select_problem", "solve_problem")
+        
+        workflow.add_conditional_edges(
+            "select_problem",
+            lambda state: "end" if state.get("error_message") or state.get("current_problem") is None else "solve_problem",
+            {
+                "solve_problem": "solve_problem",
+                "end": END
+            }
+        )
+        
         workflow.add_edge("solve_problem", "submit_solution")
         
         workflow.add_conditional_edges(
@@ -347,6 +357,12 @@ class ContestAgent:
         return state
     
     async def _solve_problem(self, state: AgentState) -> AgentState:
+        if state.get("current_problem") is None:
+            self.logger.error("Cannot solve problem: current_problem is None")
+            state["error_message"] = "No problem selected"
+            state["current_step"] = "contest_ended"
+            return state
+        
         self.logger.info(f"Solving problem {state['current_problem'].id}")
         
         try:
@@ -647,7 +663,26 @@ class ContestAgent:
         )
         
         try:
-            config = {"recursion_limit": 100} 
+            # Configure LangSmith tracing with metadata and tags
+            config = {
+                "recursion_limit": 100,
+                "metadata": {
+                    "contest_id": contest_id,
+                    "participant_id": participant_id,
+                    "agent_id": self.agent_id,
+                    "model_name": self.config.model_name if hasattr(self.config, 'model_name') else "unknown"
+                },
+                "tags": [
+                    f"contest:{contest_id}",
+                    f"participant:{participant_id}",
+                    f"agent:{self.agent_id}"
+                ]
+            }
+            
+            # Add tracer to callbacks if available
+            if self.tracer:
+                config["callbacks"] = [self.tracer]
+            
             final_state = await self.workflow.ainvoke(initial_state, config=config)
             self.logger.info(f"Contest participation completed. Final step: {final_state['current_step']}")
         except Exception as e:

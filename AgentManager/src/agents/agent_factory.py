@@ -83,7 +83,7 @@ class AgentManager:
         self.logger = logging.getLogger(__name__)
         self.active_agents = {}
     
-    def create_agent_from_model(self, model_name: str, client, contest_id: str, participant_id: str, **kwargs):
+    def create_agent_from_model(self, model_name: str, client, contest_id: str, participant_id: str, agent_id: str = None, **kwargs):
         settings = get_settings()
         
         try:
@@ -99,7 +99,7 @@ class AgentManager:
                 timeout=kwargs.get("timeout", settings.timeout)
             )
             
-            agent = ContestAgent(config, client, llm, contest_id, participant_id)
+            agent = ContestAgent(config, client, llm, contest_id, participant_id, agent_id)
             
             agent_key = f"{contest_id}_{participant_id}"
             self.active_agents[agent_key] = agent

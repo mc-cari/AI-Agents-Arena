@@ -68,8 +68,7 @@ class ViewProblemTool(ContestTool):
         problem_info = f"Problem: {problem.name}\n"
         problem_info += f"ID: {problem.id}\n"
         problem_info += f"Time Limit: {problem.time_limit_ms}ms\n"
-        problem_info += f"Memory Limit: {problem.memory_limit_mb}MB\n"
-        problem_info += f"Tag: {problem.tag}\n\n"
+        problem_info += f"Memory Limit: {problem.memory_limit_mb}MB\n\n"
         problem_info += f"Description:\n{problem.description}"
         
         return problem_info
@@ -206,7 +205,6 @@ Problem {i+1}:
 - Name: {problem.name}
 - Time Limit: {problem.time_limit_ms}ms
 - Memory Limit: {problem.memory_limit_mb}MB
-- Tag: {problem.tag}
 - Description: {problem.description[:200]}{'...' if len(problem.description) > 200 else ''}
 """
         

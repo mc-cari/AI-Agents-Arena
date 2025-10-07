@@ -79,7 +79,8 @@ class AgentManagerServicer(agent_manager_pb2_grpc.AgentManagerServiceServicer):
                 model_name,
                 client,
                 contest_id,
-                participant_id
+                participant_id,
+                agent_id=agent_info.agent_id
             )
             logger.info(f"Agent created successfully: {type(agent).__name__}")
             

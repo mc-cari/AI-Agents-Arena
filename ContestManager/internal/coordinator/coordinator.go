@@ -339,13 +339,10 @@ func (c *ContestCoordinator) handleExecutionResult(ctx context.Context, result *
 		return nil
 	}
 
-	if result.Status != models.SubmissionStatusAccepted {
-		return nil
-	}
-
-
-	if err := c.updateParticipantStats(submission, result.Status, instance.StartedAt); err != nil {
-		log.Printf("Failed to update participant stats: %v", err)
+	if result.Status == models.SubmissionStatusAccepted {
+		if err := c.updateParticipantStats(submission, result.Status, instance.StartedAt); err != nil {
+			log.Printf("Failed to update participant stats: %v", err)
+		}
 	}
 
 	if err := c.broadcastLeaderboardUpdateForContest(submission.ContestID); err != nil {
