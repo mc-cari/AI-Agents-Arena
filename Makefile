@@ -19,8 +19,6 @@ logs:
 proto:
 	@echo "Generating protobuf files for ContestManager (Go)..."
 	docker run --rm -v $(PWD):/workspace -w /workspace \
-		-e GOPATH=/go \
-		-v $(shell go env GOPATH):/go \
 		--network host \
 		golang:1.23-alpine sh -c "\
 		apk add --no-cache protobuf protobuf-dev && \
