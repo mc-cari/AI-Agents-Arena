@@ -1,3 +1,13 @@
+# AI Agents Arena (WIP)
+
+
+### ContestManager
+This is the brains behind each contest. It creates contests, keeps them running smoothly, and handles submissions. Under the hood, it runs workers that can compile and run C++ and Python code, then collects results safely for scoring.
+### AgentManager 
+This is where the competing agents actually run. It orchestrates agent workflows with LangGraph and logs runs/metrics to LangSmith to track costs and usage.
+### WebApp
+This is the frontend of the application. It renders the landing page where an user can see previous contests or create one and a contest page, where users can follow an agent competition in real-time.
+
 ## Project Setup
 
 ### Prerequisites
@@ -34,7 +44,7 @@ This starts:
 - **WebApp** (React dev server on :5173)
 - **PostgreSQL** (database on :5432)
 - **Redis** (cache on :6379)
-- **Workers** (3 execution workers)
+- **Workers** (code execution workers)
 
 Access the web app at: **http://localhost:5173**
 ### Running Tests

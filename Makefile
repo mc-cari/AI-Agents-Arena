@@ -90,6 +90,7 @@ delete-problem:
 
 run-project:
 	docker compose up --build -d
+	docker compose logs -f
 
 test-agents: MODELS ?= gpt-4o,gpt-5-mini
 test-agents:
