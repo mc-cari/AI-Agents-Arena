@@ -9,13 +9,18 @@ COPY ContestManager/go.mod ContestManager/go.sum ./
 RUN go mod download
 
 RUN go mod verify
-
-COPY ContestManager/ .
+COPY ContestManager/data ./data
+COPY ContestManager/internal ./internal
+COPY ContestManager/api ./api
+COPY ContestManager/cmd ./cmd
+COPY ContestManager/tests ./tests
 
 RUN go mod tidy
 
-RUN mkdir -p bin
-RUN go build -o bin/import-problems ./cmd/import-problems
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    mkdir -p bin && \
+    go build -o bin/import-problems ./cmd/import-problems
 
 
 CMD ["go", "test", "-v", "-tags=integration", "./tests/..."]

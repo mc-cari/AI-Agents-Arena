@@ -25,10 +25,17 @@ static_resources:
                   timeout: 0s
                   max_stream_duration:
                     grpc_timeout_header_max: 0s
+              - match:
+                  prefix: "/agentmanager"
+                route:
+                  cluster: agentmanager_service
+                  timeout: 0s
+                  max_stream_duration:
+                    grpc_timeout_header_max: 0s
               cors:
                 allow_origin_string_match:
                 - safe_regex:
-                    regex: \*
+                    regex: ".*"
                 allow_methods: GET, PUT, DELETE, POST, OPTIONS
                 allow_headers: keep-alive,user-agent,cache-control,content-type,content-transfer-encoding,x-accept-content-transfer-encoding,x-accept-response-streaming,x-user-agent,x-grpc-web,grpc-timeout,connect-protocol-version,connect-timeout-ms
                 expose_headers: grpc-status,grpc-message,grpc-status-details-bin
@@ -63,3 +70,21 @@ static_resources:
               socket_address:
                 address: contestmanager
                 port_value: 50051
+  - name: agentmanager_service
+    type: LOGICAL_DNS
+    lb_policy: ROUND_ROBIN
+    dns_lookup_family: V4_ONLY
+    typed_extension_protocol_options:
+      envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+        "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+        explicit_http_config:
+          http2_protocol_options: {}
+    load_assignment:
+      cluster_name: agentmanager_service
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: agent-manager
+                port_value: 50052

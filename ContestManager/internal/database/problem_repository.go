@@ -53,7 +53,6 @@ func (r *ProblemRepository) GetProblemsByContest(ctx context.Context, contestID 
 }
 
 func (r *ProblemRepository) AddProblemToContest(ctx context.Context, contestID, problemID uuid.UUID) error {
-	// Find the current maximum problem_order for this contest
 	var maxOrder int32
 	err := r.db.WithContext(ctx).
 		Model(&models.ContestProblem{}).
@@ -64,7 +63,6 @@ func (r *ProblemRepository) AddProblemToContest(ctx context.Context, contestID, 
 		return err
 	}
 
-	// Create the contest problem with the next order
 	return r.db.WithContext(ctx).Create(&models.ContestProblem{
 		ContestID:    contestID,
 		ProblemID:    problemID,
@@ -75,6 +73,18 @@ func (r *ProblemRepository) AddProblemToContest(ctx context.Context, contestID, 
 func (r *ProblemRepository) DeleteProblem(ctx context.Context, id uuid.UUID) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Where("problem_id = ?", id).Delete(&models.TestCase{}).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Where("problem_id = ?", id).Delete(&models.ProblemResult{}).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Where("problem_id = ?", id).Delete(&models.Submission{}).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Where("problem_id = ?", id).Delete(&models.ContestProblem{}).Error; err != nil {
 			return err
 		}
 

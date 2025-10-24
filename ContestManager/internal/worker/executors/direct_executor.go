@@ -271,6 +271,12 @@ func (de *DirectExecutor) executeTestCase(ctx context.Context, req *models.Execu
 		} else {
 			status = models.TestCaseStatusWrongAnswer
 			fmt.Printf("Status: Wrong Answer\n")
+			fmt.Printf("Expected: %q (len=%d)\n", expectedOutput, len(expectedOutput))
+			fmt.Printf("Actual:   %q (len=%d)\n", actualOutput, len(actualOutput))
+			if len(actualOutput) < 200 && len(expectedOutput) < 200 {
+				fmt.Printf("Expected (hex): %x\n", expectedOutput)
+				fmt.Printf("Actual (hex):   %x\n", actualOutput)
+			}
 		}
 	} else {
 		fmt.Printf("Status: Passed\n")

@@ -59,6 +59,11 @@ class AgentManagerServiceStub(object):
                 request_serializer=agent__manager__pb2.StreamAgentEventsRequest.SerializeToString,
                 response_deserializer=agent__manager__pb2.AgentEvent.FromString,
                 _registered_method=True)
+        self.StreamAgentStatus = channel.unary_stream(
+                '/agentmanager.AgentManagerService/StreamAgentStatus',
+                request_serializer=agent__manager__pb2.StreamAgentStatusRequest.SerializeToString,
+                response_deserializer=agent__manager__pb2.AgentStatusUpdate.FromString,
+                _registered_method=True)
 
 
 class AgentManagerServiceServicer(object):
@@ -94,6 +99,12 @@ class AgentManagerServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def StreamAgentStatus(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_AgentManagerServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -121,6 +132,11 @@ def add_AgentManagerServiceServicer_to_server(servicer, server):
                     servicer.StreamAgentEvents,
                     request_deserializer=agent__manager__pb2.StreamAgentEventsRequest.FromString,
                     response_serializer=agent__manager__pb2.AgentEvent.SerializeToString,
+            ),
+            'StreamAgentStatus': grpc.unary_stream_rpc_method_handler(
+                    servicer.StreamAgentStatus,
+                    request_deserializer=agent__manager__pb2.StreamAgentStatusRequest.FromString,
+                    response_serializer=agent__manager__pb2.AgentStatusUpdate.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -258,6 +274,33 @@ class AgentManagerService(object):
             '/agentmanager.AgentManagerService/StreamAgentEvents',
             agent__manager__pb2.StreamAgentEventsRequest.SerializeToString,
             agent__manager__pb2.AgentEvent.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def StreamAgentStatus(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/agentmanager.AgentManagerService/StreamAgentStatus',
+            agent__manager__pb2.StreamAgentStatusRequest.SerializeToString,
+            agent__manager__pb2.AgentStatusUpdate.FromString,
             options,
             channel_credentials,
             insecure,

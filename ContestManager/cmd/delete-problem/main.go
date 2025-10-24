@@ -71,5 +71,5 @@ func main() {
 		log.Fatalf("Failed to delete problem: %v", err)
 	}
 
-	fmt.Printf("Successfully deleted problem '%s' and all associated test cases\n", problemName)
+	fmt.Printf("Successfully deleted problem '%s' and all associated data (test cases, submissions, results, contest associations)\n", problemName)
 }

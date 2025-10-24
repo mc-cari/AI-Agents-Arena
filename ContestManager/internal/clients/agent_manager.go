@@ -32,12 +32,13 @@ func NewAgentManagerClient(address string) (*AgentManagerClient, error) {
 	}, nil
 }
 
-func (c *AgentManagerClient) CreateAgent(ctx context.Context, contestID, participantID, modelName, contestManagerHost string) (string, error) {
+func (c *AgentManagerClient) CreateAgent(ctx context.Context, contestID, participantID, modelName, contestManagerHost string, problems []*agentmanager.Problem) (string, error) {
 	resp, err := c.client.CreateAgent(ctx, &agentmanager.CreateAgentRequest{
 		ContestId:          contestID,
 		ParticipantId:      participantID,
 		ModelName:         modelName,
 		ContestManagerHost: contestManagerHost,
+		Problems:          problems,
 	})
 	if err != nil {
 		return "", fmt.Errorf("failed to create agent: %w", err)

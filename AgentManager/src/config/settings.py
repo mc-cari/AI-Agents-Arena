@@ -30,6 +30,9 @@ class Settings(BaseModel):
     max_concurrent_agents: int
     agent_timeout: float
     
+    workflow_recursion_limit: int
+    max_context_tokens: int
+    
     def __init__(self, **kwargs):
         load_dotenv()
         
@@ -58,6 +61,9 @@ class Settings(BaseModel):
             
             'max_concurrent_agents': int(os.getenv('MAX_CONCURRENT_AGENTS', '10')),
             'agent_timeout': float(os.getenv('AGENT_TIMEOUT', '300.0')),
+            
+            'workflow_recursion_limit': int(os.getenv('WORKFLOW_RECURSION_LIMIT', '100')),
+            'max_context_tokens': int(os.getenv('MAX_CONTEXT_TOKENS', '4000')),
         }
         
         env_data.update(kwargs)

@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-contestmanager}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-contestmanager_password}
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -23,7 +23,7 @@ services:
     image: redis:7-alpine
     container_name: contestmanager-redis
     ports:
-      - "6379:6379"
+      - "6380:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 0.5s
@@ -76,7 +76,8 @@ services:
     ports:
       - "50052:50052"
     environment:
-      - CONTEST_MANAGER_HOST=contestmanager:50051
+      - CONTEST_MANAGER_HOST=contestmanager
+      - GRPC_SERVER_PORT=50051
       - TEMPERATURE=${TEMPERATURE:-0.1}
       - MAX_TOKENS=${MAX_TOKENS:-4000}
       - TIMEOUT=${TIMEOUT:-30.0}
@@ -184,15 +185,12 @@ services:
   webapp:
     build:
       context: ./WebApp
-      dockerfile: Dockerfile.dev
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8080}
     container_name: ai-contest-webapp
-    environment:
-      - VITE_API_URL=http://localhost:8080
     ports:
-      - "5173:5173"
-    volumes:
-      - ./WebApp:/app
-      - /app/node_modules
+      - "5173:80"
     depends_on:
       - envoy
     restart: unless-stopped

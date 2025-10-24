@@ -155,3 +155,19 @@ func (r *SubmissionRepository) GetLastSubmission(
 
 	return &submission, nil
 }
+
+func (r *SubmissionRepository) CancelPendingSubmissions(ctx context.Context, contestID uuid.UUID) error {
+	pendingStatuses := []models.SubmissionStatus{
+		models.SubmissionStatusPending,
+		models.SubmissionStatusCompiling,
+		models.SubmissionStatusRunning,
+	}
+
+	return r.db.WithContext(ctx).
+		Model(&models.Submission{}).
+		Where("contest_id = ? AND status IN ?", contestID, pendingStatuses).
+		Updates(map[string]interface{}{
+			"status":          models.SubmissionStatusCancelled,
+			"verdict_message": "Contest ended",
+		}).Error
+}

@@ -14,6 +14,16 @@ service AgentManagerService {
   rpc StopAgent(StopAgentRequest) returns (StopAgentResponse);
   
   rpc StreamAgentEvents(StreamAgentEventsRequest) returns (stream AgentEvent);
+  
+  rpc StreamAgentStatus(StreamAgentStatusRequest) returns (stream AgentStatusUpdate);
+}
+
+message Problem {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  int32 time_limit_ms = 4;
+  int32 memory_limit_mb = 5;
 }
 
 message CreateAgentRequest {
@@ -21,10 +31,11 @@ message CreateAgentRequest {
   string participant_id = 2;
   string model_name = 3;
   string contest_manager_host = 4;
+  repeated Problem problems = 5;
   
-  optional float temperature = 5;
-  optional int32 max_tokens = 6;
-  optional float timeout = 7;
+  optional float temperature = 6;
+  optional int32 max_tokens = 7;
+  optional float timeout = 8;
 }
 
 message CreateAgentResponse {
@@ -46,12 +57,6 @@ message AgentStatusResponse {
   string participant_id = 3;
   string model_name = 4;
   AgentStatus status = 5;
-  int32 problems_solved = 6;
-  int32 problems_attempted = 7;
-  string current_problem = 8;
-  int64 started_at = 9; // Unix timestamp
-  optional int64 completed_at = 10; // Unix timestamp
-  string error_message = 11;
 }
 
 message ListAgentsRequest {
@@ -86,11 +91,31 @@ message AgentEvent {
   map<string, string> metadata = 5;
 }
 
+message StreamAgentStatusRequest {
+  optional string contest_id = 1;  
+}
+
+message AgentStatusUpdate {
+  string agent_id = 1;
+  string contest_id = 2;
+  string participant_id = 3;
+  string model_name = 4;
+  AgentStatus status = 5;
+  int64 timestamp = 6; 
+}
+
 enum AgentStatus {
   AGENT_STATUS_UNKNOWN = 0;
   AGENT_STATUS_INITIALIZING = 1;
-  AGENT_STATUS_RUNNING = 2;
-  AGENT_STATUS_COMPLETED = 3;
-  AGENT_STATUS_FAILED = 4;
-  AGENT_STATUS_STOPPED = 5;
+  AGENT_STATUS_ANALYZING_CONTEST = 2;
+  AGENT_STATUS_SELECTING_PROBLEM = 3;
+  AGENT_STATUS_SOLVING_PROBLEM = 4;
+  AGENT_STATUS_CODING = 5;
+  AGENT_STATUS_SUBMITTING_SOLUTION = 6;
+  AGENT_STATUS_CHECKING_RESULTS = 7;
+  AGENT_STATUS_MONITORING_CONTEST = 8;
+  AGENT_STATUS_COMPLETED = 9;
+  AGENT_STATUS_FAILED = 10;
+  AGENT_STATUS_STOPPED = 11;
+  AGENT_STATUS_CONTEST_ENDED = 12;
 }

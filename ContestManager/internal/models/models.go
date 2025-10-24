@@ -36,6 +36,7 @@ const (
 	SubmissionStatusCompilationError    SubmissionStatus = "COMPILATION_ERROR"
 	SubmissionStatusOutputLimitExceeded SubmissionStatus = "OUTPUT_LIMIT_EXCEEDED"
 	SubmissionStatusJudgementFailed     SubmissionStatus = "JUDGEMENT_FAILED"
+	SubmissionStatusCancelled       SubmissionStatus = "CANCELLED"
 )
 
 type ProblemTag string

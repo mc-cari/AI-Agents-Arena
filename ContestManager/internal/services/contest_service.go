@@ -8,6 +8,7 @@ import (
 
 	"contestmanager/api/grpc"
 	"contestmanager/internal/clients"
+	"contestmanager/api/grpc/agentmanager"
 	"contestmanager/internal/config"
 	"contestmanager/internal/coordinator"
 	"contestmanager/internal/database"
@@ -131,6 +132,23 @@ func (cs *ContestService) CreateContest(ctx context.Context, req *grpc.CreateCon
 		}
 	}
 
+	problems, err := cs.problemRepo.GetProblemsByContest(ctx, contest.ID)
+	if err != nil {
+			log.Printf("Failed to get problems for contest %s: %v", contest.ID, err)
+			return nil, fmt.Errorf("failed to get problems: %w", err)
+	}
+
+	pbProblems := make([]*agentmanager.Problem, len(problems))
+	for i, problem := range problems {
+			pbProblems[i] = &agentmanager.Problem{
+					Id:            problem.ID.String(),
+					Name:          problem.Name,
+					Description:   problem.Description,
+					TimeLimitMs:   int32(problem.TimeLimitMs),
+					MemoryLimitMb: int32(problem.MemoryLimitMb),
+			}
+	}
+
 	agentIDs := make(map[uuid.UUID]string)
 	if cs.agentManager != nil {
 		log.Printf("Creating agents for %d participants in contest %s", len(participants), contest.ID)
@@ -141,6 +159,7 @@ func (cs *ContestService) CreateContest(ctx context.Context, req *grpc.CreateCon
 				participant.ID.String(),
 				participant.ModelName,
 				cs.config.Server.Address,
+				pbProblems,
 			)
 			if err != nil {
 				log.Printf("Failed to create agent for participant %s (model: %s): %v", 
@@ -247,6 +266,17 @@ func (cs *ContestService) CreateContestWithProblems(ctx context.Context, req *gr
 		}
 	}
 
+	pbProblems := make([]*agentmanager.Problem, len(problems))
+	for i, problem := range problems {
+			pbProblems[i] = &agentmanager.Problem{
+					Id:            problem.ID.String(),
+					Name:          problem.Name,
+					Description:   problem.Description,
+					TimeLimitMs:   int32(problem.TimeLimitMs),
+					MemoryLimitMb: int32(problem.MemoryLimitMb),
+			}
+	}
+
 	agentIDs := make(map[uuid.UUID]string)
 	if cs.agentManager != nil {
 		log.Printf("Creating agents for %d participants in contest %s", len(participants), contest.ID)
@@ -257,6 +287,7 @@ func (cs *ContestService) CreateContestWithProblems(ctx context.Context, req *gr
 				participant.ID.String(),
 				participant.ModelName,
 				cs.config.Server.Address,
+				pbProblems,
 			)
 			if err != nil {
 				log.Printf("Failed to create agent for participant %s (model: %s): %v", 
@@ -440,7 +471,7 @@ func (s *ContestService) SubmitSolution(ctx context.Context, req *grpc.SubmitSol
 	}
 
 
-	if err := s.coordinator.ProcessSubmission(submissionID); err != nil {
+	if err := s.coordinator.ProcessSubmission(submissionID, contestID); err != nil {
 		return nil, fmt.Errorf("failed to process submission: %w", err)
 	}
 
@@ -540,12 +571,12 @@ func (s *ContestService) StreamLeaderboard(req *grpc.StreamLeaderboardRequest, s
 			Participants:       grpcParticipants,
 			UpdatedAt:          timestamppb.New(update.UpdatedAt),
 			RecentSubmissions:  grpcSubmissions,
-		}
+			}
 
 		if err := stream.Send(grpcUpdate); err != nil {
-			return err
+				return err
+			}
 		}
-	}
 	return nil
 }
 

@@ -7,7 +7,7 @@ services:
       POSTGRES_USER: ${TEST_DB_USER:-contestmanager}
       POSTGRES_PASSWORD: ${TEST_DB_PASSWORD:-contestmanager_password}
     ports:
-      - "5433:5432"  
+      - "5434:5432"  
     volumes:
       - postgres_test_data:/var/lib/postgresql/data
     healthcheck:
@@ -22,7 +22,7 @@ services:
     image: redis:7-alpine
     container_name: contestmanager-redis-test
     ports:
-      - "6380:6379"  
+      - "6381:6379"  
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 0.5s
@@ -130,8 +130,6 @@ services:
       - LANGSMITH_PROJECT=${LANGSMITH_PROJECT:-contest-agent-test}
       - LANGSMITH_ENDPOINT=${LANGSMITH_ENDPOINT:-https://api.smith.langchain.com}
       - LANGSMITH_TRACING_V2=${LANGSMITH_TRACING_V2:-true}
-      - CONTEST_ID=${CONTEST_ID}
-      - PARTICIPANT_ID=${PARTICIPANT_ID}
       - MAX_CONCURRENT_AGENTS=${MAX_CONCURRENT_AGENTS:-10}
       - AGENT_TIMEOUT=${AGENT_TIMEOUT:-300.0}
       - AGENT_LOG_LEVEL=${AGENT_LOG_LEVEL:-DEBUG}

@@ -163,6 +163,14 @@ func (c *ContestCoordinator) StopContest(contestID uuid.UUID) error {
 		log.Printf("Failed to update contest state: %v", err)
 	}
 
+	if err := c.submissionRepo.CancelPendingSubmissions(context.Background(), contestID); err != nil {
+		log.Printf("Failed to cancel pending submissions: %v", err)
+	}
+
+	if err := c.broadcastLeaderboardUpdateForContest(contestID); err != nil {
+		log.Printf("Failed to broadcast leaderboard update: %v", err)
+	}
+
 	c.mu.Lock()
 	delete(c.activeContests, contestID)
 	delete(c.leaderboardSubscribers, contestID)
@@ -171,18 +179,18 @@ func (c *ContestCoordinator) StopContest(contestID uuid.UUID) error {
 	return nil
 }
 
-func (c *ContestCoordinator) ProcessSubmission(submissionID uuid.UUID) error {
-	submission, err := c.submissionRepo.GetSubmission(context.Background(), submissionID)
-	if err != nil {
-		return fmt.Errorf("failed to get submission: %w", err)
-	}
-
+func (c *ContestCoordinator) ProcessSubmission(submissionId uuid.UUID, contestID uuid.UUID) error {
 	c.mu.RLock()
-	_, exists := c.activeContests[submission.ContestID]
+	_, exists := c.activeContests[contestID]
 	c.mu.RUnlock()
 
 	if !exists {
-		return fmt.Errorf("contest %s not active", submission.ContestID)
+		return fmt.Errorf("contest %s not active", contestID)
+	}
+
+	submission, err := c.submissionRepo.GetSubmission(context.Background(), submissionId)
+	if err != nil {
+		return fmt.Errorf("failed to get submission: %w", err)
 	}
 
 	testCases, err := c.testCaseRepo.GetTestCasesByProblem(context.Background(), submission.ProblemID)
@@ -201,7 +209,7 @@ func (c *ContestCoordinator) ProcessSubmission(submissionID uuid.UUID) error {
 
 	execRequest := &models.ExecutionRequest{
 		JobID:         uuid.New(),
-		SubmissionID:  submissionID,
+		SubmissionID:  submission.ID,
 		ContestID:     submission.ContestID,
 		ParticipantID: submission.ParticipantID,
 		ProblemID:     submission.ProblemID,
@@ -215,23 +223,26 @@ func (c *ContestCoordinator) ProcessSubmission(submissionID uuid.UUID) error {
 
 	if err := c.submissionRepo.UpdateSubmissionStatus(
 		context.Background(),
-		submissionID,
+		submission.ID,
 		models.SubmissionStatusPending,
 		"Queued for execution",
 	); err != nil {
 		return fmt.Errorf("failed to update submission status: %w", err)
 	}
 
+	if err := c.broadcastLeaderboardUpdateForContest(contestID); err != nil {
+		log.Printf("Failed to broadcast leaderboard update for new submission: %v", err)
+	}
+
 	if err := c.execQueue.QueueExecution(context.Background(), execRequest); err != nil {
 		c.submissionRepo.UpdateSubmissionStatus(
 			context.Background(),
-			submissionID,
+			submission.ID,
 			models.SubmissionStatusJudgementFailed,
 			"Failed to queue for execution",
 		)
 		return fmt.Errorf("failed to queue execution: %w", err)
 	}
-
 
 	return nil
 }
@@ -328,6 +339,16 @@ func (c *ContestCoordinator) handleExecutionResult(ctx context.Context, result *
 	submission, err := c.submissionRepo.GetSubmission(ctx, result.SubmissionID)
 	if err != nil {
 		return fmt.Errorf("failed to get submission: %w", err)
+	}
+
+	contest, err := c.contestRepo.GetContest(ctx, submission.ContestID)
+	if err != nil {
+		return fmt.Errorf("failed to get contest %s: %w", submission.ContestID, err)
+	}
+
+	if contest.State == models.ContestStateFinished {
+		log.Printf("Contest %s has finished, skipping stats update for submission %s", submission.ContestID, submission.ID)
+		return nil
 	}
 
 	c.mu.RLock()

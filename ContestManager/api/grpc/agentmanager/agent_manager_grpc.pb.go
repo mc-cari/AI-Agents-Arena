@@ -24,6 +24,7 @@ const (
 	AgentManagerService_ListAgents_FullMethodName        = "/agentmanager.AgentManagerService/ListAgents"
 	AgentManagerService_StopAgent_FullMethodName         = "/agentmanager.AgentManagerService/StopAgent"
 	AgentManagerService_StreamAgentEvents_FullMethodName = "/agentmanager.AgentManagerService/StreamAgentEvents"
+	AgentManagerService_StreamAgentStatus_FullMethodName = "/agentmanager.AgentManagerService/StreamAgentStatus"
 )
 
 // AgentManagerServiceClient is the client API for AgentManagerService service.
@@ -35,6 +36,7 @@ type AgentManagerServiceClient interface {
 	ListAgents(ctx context.Context, in *ListAgentsRequest, opts ...grpc.CallOption) (*ListAgentsResponse, error)
 	StopAgent(ctx context.Context, in *StopAgentRequest, opts ...grpc.CallOption) (*StopAgentResponse, error)
 	StreamAgentEvents(ctx context.Context, in *StreamAgentEventsRequest, opts ...grpc.CallOption) (AgentManagerService_StreamAgentEventsClient, error)
+	StreamAgentStatus(ctx context.Context, in *StreamAgentStatusRequest, opts ...grpc.CallOption) (AgentManagerService_StreamAgentStatusClient, error)
 }
 
 type agentManagerServiceClient struct {
@@ -113,6 +115,38 @@ func (x *agentManagerServiceStreamAgentEventsClient) Recv() (*AgentEvent, error)
 	return m, nil
 }
 
+func (c *agentManagerServiceClient) StreamAgentStatus(ctx context.Context, in *StreamAgentStatusRequest, opts ...grpc.CallOption) (AgentManagerService_StreamAgentStatusClient, error) {
+	stream, err := c.cc.NewStream(ctx, &AgentManagerService_ServiceDesc.Streams[1], AgentManagerService_StreamAgentStatus_FullMethodName, opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &agentManagerServiceStreamAgentStatusClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type AgentManagerService_StreamAgentStatusClient interface {
+	Recv() (*AgentStatusUpdate, error)
+	grpc.ClientStream
+}
+
+type agentManagerServiceStreamAgentStatusClient struct {
+	grpc.ClientStream
+}
+
+func (x *agentManagerServiceStreamAgentStatusClient) Recv() (*AgentStatusUpdate, error) {
+	m := new(AgentStatusUpdate)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // AgentManagerServiceServer is the server API for AgentManagerService service.
 // All implementations must embed UnimplementedAgentManagerServiceServer
 // for forward compatibility
@@ -122,6 +156,7 @@ type AgentManagerServiceServer interface {
 	ListAgents(context.Context, *ListAgentsRequest) (*ListAgentsResponse, error)
 	StopAgent(context.Context, *StopAgentRequest) (*StopAgentResponse, error)
 	StreamAgentEvents(*StreamAgentEventsRequest, AgentManagerService_StreamAgentEventsServer) error
+	StreamAgentStatus(*StreamAgentStatusRequest, AgentManagerService_StreamAgentStatusServer) error
 	mustEmbedUnimplementedAgentManagerServiceServer()
 }
 
@@ -143,6 +178,9 @@ func (UnimplementedAgentManagerServiceServer) StopAgent(context.Context, *StopAg
 }
 func (UnimplementedAgentManagerServiceServer) StreamAgentEvents(*StreamAgentEventsRequest, AgentManagerService_StreamAgentEventsServer) error {
 	return status.Errorf(codes.Unimplemented, "method StreamAgentEvents not implemented")
+}
+func (UnimplementedAgentManagerServiceServer) StreamAgentStatus(*StreamAgentStatusRequest, AgentManagerService_StreamAgentStatusServer) error {
+	return status.Errorf(codes.Unimplemented, "method StreamAgentStatus not implemented")
 }
 func (UnimplementedAgentManagerServiceServer) mustEmbedUnimplementedAgentManagerServiceServer() {}
 
@@ -250,6 +288,27 @@ func (x *agentManagerServiceStreamAgentEventsServer) Send(m *AgentEvent) error {
 	return x.ServerStream.SendMsg(m)
 }
 
+func _AgentManagerService_StreamAgentStatus_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamAgentStatusRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(AgentManagerServiceServer).StreamAgentStatus(m, &agentManagerServiceStreamAgentStatusServer{stream})
+}
+
+type AgentManagerService_StreamAgentStatusServer interface {
+	Send(*AgentStatusUpdate) error
+	grpc.ServerStream
+}
+
+type agentManagerServiceStreamAgentStatusServer struct {
+	grpc.ServerStream
+}
+
+func (x *agentManagerServiceStreamAgentStatusServer) Send(m *AgentStatusUpdate) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 // AgentManagerService_ServiceDesc is the grpc.ServiceDesc for AgentManagerService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -278,6 +337,11 @@ var AgentManagerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "StreamAgentEvents",
 			Handler:       _AgentManagerService_StreamAgentEvents_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "StreamAgentStatus",
+			Handler:       _AgentManagerService_StreamAgentStatus_Handler,
 			ServerStreams: true,
 		},
 	},

@@ -26,7 +26,7 @@ func TestContestManagerIntegration(t *testing.T) {
 		contest := env.CreateSampleContest(t, problem.ID)
 		require.NotNil(t, contest, "Contest should be created successfully")
 
-		err := env.Coordinator.StartContest(contest.ID)
+		err := env.Coordinator.StartContest(contest.ID, nil, nil)
 		require.NoError(t, err, "Contest should start successfully")
 
 		participants, err := env.ParticipantRepo.GetParticipantsByContest(context.Background(), contest.ID)
@@ -45,16 +45,16 @@ func TestContestManagerIntegration(t *testing.T) {
 		timeLimitSubmission := env.CreateSampleSubmission(t, contest.ID, participants[0].ID, problem.ID, "sum_two_numbers", "cpp_tle")
 		require.NotNil(t, timeLimitSubmission, "Time limit submission should be created")
 
-		err = env.Coordinator.ProcessSubmission(validSubmission.ID)
+		err = env.Coordinator.ProcessSubmission(validSubmission.ID, contest.ID)
 		require.NoError(t, err, "Should process valid submission")
 
-		err = env.Coordinator.ProcessSubmission(pythonSubmission.ID)
+		err = env.Coordinator.ProcessSubmission(pythonSubmission.ID, contest.ID)
 		require.NoError(t, err, "Should process Python submission")
 
-		err = env.Coordinator.ProcessSubmission(invalidCppSubmission.ID)
+		err = env.Coordinator.ProcessSubmission(invalidCppSubmission.ID, contest.ID)
 		require.NoError(t, err, "Should process invalid C++ submission")
 
-		err = env.Coordinator.ProcessSubmission(timeLimitSubmission.ID)
+		err = env.Coordinator.ProcessSubmission(timeLimitSubmission.ID, contest.ID)
 		require.NoError(t, err, "Should process time limit submission")
 
 		time.Sleep(5 * time.Second)

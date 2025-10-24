@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x13\x61gent_manager.proto\x12\x0c\x61gentmanager\"\xe6\x01\n\x12\x43reateAgentRequest\x12\x12\n\ncontest_id\x18\x01 \x01(\t\x12\x16\n\x0eparticipant_id\x18\x02 \x01(\t\x12\x12\n\nmodel_name\x18\x03 \x01(\t\x12\x1c\n\x14\x63ontest_manager_host\x18\x04 \x01(\t\x12\x18\n\x0btemperature\x18\x05 \x01(\x02H\x00\x88\x01\x01\x12\x17\n\nmax_tokens\x18\x06 \x01(\x05H\x01\x88\x01\x01\x12\x14\n\x07timeout\x18\x07 \x01(\x02H\x02\x88\x01\x01\x42\x0e\n\x0c_temperatureB\r\n\x0b_max_tokensB\n\n\x08_timeout\"\xa3\x01\n\x13\x43reateAgentResponse\x12\x10\n\x08\x61gent_id\x18\x01 \x01(\t\x12\x12\n\ncontest_id\x18\x02 \x01(\t\x12\x16\n\x0eparticipant_id\x18\x03 \x01(\t\x12\x12\n\nmodel_name\x18\x04 \x01(\t\x12)\n\x06status\x18\x05 \x01(\x0e\x32\x19.agentmanager.AgentStatus\x12\x0f\n\x07message\x18\x06 \x01(\t\")\n\x15GetAgentStatusRequest\x12\x10\n\x08\x61gent_id\x18\x01 \x01(\t\"\xb7\x02\n\x13\x41gentStatusResponse\x12\x10\n\x08\x61gent_id\x18\x01 \x01(\t\x12\x12\n\ncontest_id\x18\x02 \x01(\t\x12\x16\n\x0eparticipant_id\x18\x03 \x01(\t\x12\x12\n\nmodel_name\x18\x04 \x01(\t\x12)\n\x06status\x18\x05 \x01(\x0e\x32\x19.agentmanager.AgentStatus\x12\x17\n\x0fproblems_solved\x18\x06 \x01(\x05\x12\x1a\n\x12problems_attempted\x18\x07 \x01(\x05\x12\x17\n\x0f\x63urrent_problem\x18\x08 \x01(\t\x12\x12\n\nstarted_at\x18\t \x01(\x03\x12\x19\n\x0c\x63ompleted_at\x18\n \x01(\x03H\x00\x88\x01\x01\x12\x15\n\rerror_message\x18\x0b \x01(\tB\x0f\n\r_completed_at\"v\n\x11ListAgentsRequest\x12\x17\n\ncontest_id\x18\x01 \x01(\tH\x00\x88\x01\x01\x12.\n\x06status\x18\x02 \x01(\x0e\x32\x19.agentmanager.AgentStatusH\x01\x88\x01\x01\x42\r\n\x0b_contest_idB\t\n\x07_status\"G\n\x12ListAgentsResponse\x12\x31\n\x06\x61gents\x18\x01 \x03(\x0b\x32!.agentmanager.AgentStatusResponse\"4\n\x10StopAgentRequest\x12\x10\n\x08\x61gent_id\x18\x01 \x01(\t\x12\x0e\n\x06reason\x18\x02 \x01(\t\"G\n\x11StopAgentResponse\x12\x10\n\x08\x61gent_id\x18\x01 \x01(\t\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12\x0f\n\x07message\x18\x03 \x01(\t\",\n\x18StreamAgentEventsRequest\x12\x10\n\x08\x61gent_id\x18\x01 \x01(\t\"\xc1\x01\n\nAgentEvent\x12\x10\n\x08\x61gent_id\x18\x01 \x01(\t\x12\x12\n\nevent_type\x18\x02 \x01(\t\x12\x0f\n\x07message\x18\x03 \x01(\t\x12\x11\n\ttimestamp\x18\x04 \x01(\x03\x12\x38\n\x08metadata\x18\x05 \x03(\x0b\x32&.agentmanager.AgentEvent.MetadataEntry\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01*\xaf\x01\n\x0b\x41gentStatus\x12\x18\n\x14\x41GENT_STATUS_UNKNOWN\x10\x00\x12\x1d\n\x19\x41GENT_STATUS_INITIALIZING\x10\x01\x12\x18\n\x14\x41GENT_STATUS_RUNNING\x10\x02\x12\x1a\n\x16\x41GENT_STATUS_COMPLETED\x10\x03\x12\x17\n\x13\x41GENT_STATUS_FAILED\x10\x04\x12\x18\n\x14\x41GENT_STATUS_STOPPED\x10\x05\x32\xbb\x03\n\x13\x41gentManagerService\x12R\n\x0b\x43reateAgent\x12 .agentmanager.CreateAgentRequest\x1a!.agentmanager.CreateAgentResponse\x12X\n\x0eGetAgentStatus\x12#.agentmanager.GetAgentStatusRequest\x1a!.agentmanager.AgentStatusResponse\x12O\n\nListAgents\x12\x1f.agentmanager.ListAgentsRequest\x1a .agentmanager.ListAgentsResponse\x12L\n\tStopAgent\x12\x1e.agentmanager.StopAgentRequest\x1a\x1f.agentmanager.StopAgentResponse\x12W\n\x11StreamAgentEvents\x12&.agentmanager.StreamAgentEventsRequest\x1a\x18.agentmanager.AgentEvent0\x01\x42&Z$contestmanager/api/grpc/agentmanagerb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x13\x61gent_manager.proto\x12\x0c\x61gentmanager\"h\n\x07Problem\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12\x13\n\x0b\x64\x65scription\x18\x03 \x01(\t\x12\x15\n\rtime_limit_ms\x18\x04 \x01(\x05\x12\x17\n\x0fmemory_limit_mb\x18\x05 \x01(\x05\"\x8f\x02\n\x12\x43reateAgentRequest\x12\x12\n\ncontest_id\x18\x01 \x01(\t\x12\x16\n\x0eparticipant_id\x18\x02 \x01(\t\x12\x12\n\nmodel_name\x18\x03 \x01(\t\x12\x1c\n\x14\x63ontest_manager_host\x18\x04 \x01(\t\x12\'\n\x08problems\x18\x05 \x03(\x0b\x32\x15.agentmanager.Problem\x12\x18\n\x0btemperature\x18\x06 \x01(\x02H\x00\x88\x01\x01\x12\x17\n\nmax_tokens\x18\x07 \x01(\x05H\x01\x88\x01\x01\x12\x14\n\x07timeout\x18\x08 \x01(\x02H\x02\x88\x01\x01\x42\x0e\n\x0c_temperatureB\r\n\x0b_max_tokensB\n\n\x08_timeout\"\xa3\x01\n\x13\x43reateAgentResponse\x12\x10\n\x08\x61gent_id\x18\x01 \x01(\t\x12\x12\n\ncontest_id\x18\x02 \x01(\t\x12\x16\n\x0eparticipant_id\x18\x03 \x01(\t\x12\x12\n\nmodel_name\x18\x04 \x01(\t\x12)\n\x06status\x18\x05 \x01(\x0e\x32\x19.agentmanager.AgentStatus\x12\x0f\n\x07message\x18\x06 \x01(\t\")\n\x15GetAgentStatusRequest\x12\x10\n\x08\x61gent_id\x18\x01 \x01(\t\"\x92\x01\n\x13\x41gentStatusResponse\x12\x10\n\x08\x61gent_id\x18\x01 \x01(\t\x12\x12\n\ncontest_id\x18\x02 \x01(\t\x12\x16\n\x0eparticipant_id\x18\x03 \x01(\t\x12\x12\n\nmodel_name\x18\x04 \x01(\t\x12)\n\x06status\x18\x05 \x01(\x0e\x32\x19.agentmanager.AgentStatus\"v\n\x11ListAgentsRequest\x12\x17\n\ncontest_id\x18\x01 \x01(\tH\x00\x88\x01\x01\x12.\n\x06status\x18\x02 \x01(\x0e\x32\x19.agentmanager.AgentStatusH\x01\x88\x01\x01\x42\r\n\x0b_contest_idB\t\n\x07_status\"G\n\x12ListAgentsResponse\x12\x31\n\x06\x61gents\x18\x01 \x03(\x0b\x32!.agentmanager.AgentStatusResponse\"4\n\x10StopAgentRequest\x12\x10\n\x08\x61gent_id\x18\x01 \x01(\t\x12\x0e\n\x06reason\x18\x02 \x01(\t\"G\n\x11StopAgentResponse\x12\x10\n\x08\x61gent_id\x18\x01 \x01(\t\x12\x0f\n\x07success\x18\x02 \x01(\x08\x12\x0f\n\x07message\x18\x03 \x01(\t\",\n\x18StreamAgentEventsRequest\x12\x10\n\x08\x61gent_id\x18\x01 \x01(\t\"\xc1\x01\n\nAgentEvent\x12\x10\n\x08\x61gent_id\x18\x01 \x01(\t\x12\x12\n\nevent_type\x18\x02 \x01(\t\x12\x0f\n\x07message\x18\x03 \x01(\t\x12\x11\n\ttimestamp\x18\x04 \x01(\x03\x12\x38\n\x08metadata\x18\x05 \x03(\x0b\x32&.agentmanager.AgentEvent.MetadataEntry\x1a/\n\rMetadataEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"B\n\x18StreamAgentStatusRequest\x12\x17\n\ncontest_id\x18\x01 \x01(\tH\x00\x88\x01\x01\x42\r\n\x0b_contest_id\"\xa3\x01\n\x11\x41gentStatusUpdate\x12\x10\n\x08\x61gent_id\x18\x01 \x01(\t\x12\x12\n\ncontest_id\x18\x02 \x01(\t\x12\x16\n\x0eparticipant_id\x18\x03 \x01(\t\x12\x12\n\nmodel_name\x18\x04 \x01(\t\x12)\n\x06status\x18\x05 \x01(\x0e\x32\x19.agentmanager.AgentStatus\x12\x11\n\ttimestamp\x18\x06 \x01(\x03*\xa6\x03\n\x0b\x41gentStatus\x12\x18\n\x14\x41GENT_STATUS_UNKNOWN\x10\x00\x12\x1d\n\x19\x41GENT_STATUS_INITIALIZING\x10\x01\x12\"\n\x1e\x41GENT_STATUS_ANALYZING_CONTEST\x10\x02\x12\"\n\x1e\x41GENT_STATUS_SELECTING_PROBLEM\x10\x03\x12 \n\x1c\x41GENT_STATUS_SOLVING_PROBLEM\x10\x04\x12\x17\n\x13\x41GENT_STATUS_CODING\x10\x05\x12$\n AGENT_STATUS_SUBMITTING_SOLUTION\x10\x06\x12!\n\x1d\x41GENT_STATUS_CHECKING_RESULTS\x10\x07\x12#\n\x1f\x41GENT_STATUS_MONITORING_CONTEST\x10\x08\x12\x1a\n\x16\x41GENT_STATUS_COMPLETED\x10\t\x12\x17\n\x13\x41GENT_STATUS_FAILED\x10\n\x12\x18\n\x14\x41GENT_STATUS_STOPPED\x10\x0b\x12\x1e\n\x1a\x41GENT_STATUS_CONTEST_ENDED\x10\x0c\x32\x9b\x04\n\x13\x41gentManagerService\x12R\n\x0b\x43reateAgent\x12 .agentmanager.CreateAgentRequest\x1a!.agentmanager.CreateAgentResponse\x12X\n\x0eGetAgentStatus\x12#.agentmanager.GetAgentStatusRequest\x1a!.agentmanager.AgentStatusResponse\x12O\n\nListAgents\x12\x1f.agentmanager.ListAgentsRequest\x1a .agentmanager.ListAgentsResponse\x12L\n\tStopAgent\x12\x1e.agentmanager.StopAgentRequest\x1a\x1f.agentmanager.StopAgentResponse\x12W\n\x11StreamAgentEvents\x12&.agentmanager.StreamAgentEventsRequest\x1a\x18.agentmanager.AgentEvent0\x01\x12^\n\x11StreamAgentStatus\x12&.agentmanager.StreamAgentStatusRequest\x1a\x1f.agentmanager.AgentStatusUpdate0\x01\x42&Z$contestmanager/api/grpc/agentmanagerb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -34,30 +34,36 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['DESCRIPTOR']._serialized_options = b'Z$contestmanager/api/grpc/agentmanager'
   _globals['_AGENTEVENT_METADATAENTRY']._loaded_options = None
   _globals['_AGENTEVENT_METADATAENTRY']._serialized_options = b'8\001'
-  _globals['_AGENTSTATUS']._serialized_start=1356
-  _globals['_AGENTSTATUS']._serialized_end=1531
-  _globals['_CREATEAGENTREQUEST']._serialized_start=38
-  _globals['_CREATEAGENTREQUEST']._serialized_end=268
-  _globals['_CREATEAGENTRESPONSE']._serialized_start=271
-  _globals['_CREATEAGENTRESPONSE']._serialized_end=434
-  _globals['_GETAGENTSTATUSREQUEST']._serialized_start=436
-  _globals['_GETAGENTSTATUSREQUEST']._serialized_end=477
-  _globals['_AGENTSTATUSRESPONSE']._serialized_start=480
-  _globals['_AGENTSTATUSRESPONSE']._serialized_end=791
-  _globals['_LISTAGENTSREQUEST']._serialized_start=793
-  _globals['_LISTAGENTSREQUEST']._serialized_end=911
-  _globals['_LISTAGENTSRESPONSE']._serialized_start=913
-  _globals['_LISTAGENTSRESPONSE']._serialized_end=984
-  _globals['_STOPAGENTREQUEST']._serialized_start=986
-  _globals['_STOPAGENTREQUEST']._serialized_end=1038
-  _globals['_STOPAGENTRESPONSE']._serialized_start=1040
-  _globals['_STOPAGENTRESPONSE']._serialized_end=1111
-  _globals['_STREAMAGENTEVENTSREQUEST']._serialized_start=1113
-  _globals['_STREAMAGENTEVENTSREQUEST']._serialized_end=1157
-  _globals['_AGENTEVENT']._serialized_start=1160
-  _globals['_AGENTEVENT']._serialized_end=1353
-  _globals['_AGENTEVENT_METADATAENTRY']._serialized_start=1306
-  _globals['_AGENTEVENT_METADATAENTRY']._serialized_end=1353
-  _globals['_AGENTMANAGERSERVICE']._serialized_start=1534
-  _globals['_AGENTMANAGERSERVICE']._serialized_end=1977
+  _globals['_AGENTSTATUS']._serialized_start=1572
+  _globals['_AGENTSTATUS']._serialized_end=1994
+  _globals['_PROBLEM']._serialized_start=37
+  _globals['_PROBLEM']._serialized_end=141
+  _globals['_CREATEAGENTREQUEST']._serialized_start=144
+  _globals['_CREATEAGENTREQUEST']._serialized_end=415
+  _globals['_CREATEAGENTRESPONSE']._serialized_start=418
+  _globals['_CREATEAGENTRESPONSE']._serialized_end=581
+  _globals['_GETAGENTSTATUSREQUEST']._serialized_start=583
+  _globals['_GETAGENTSTATUSREQUEST']._serialized_end=624
+  _globals['_AGENTSTATUSRESPONSE']._serialized_start=627
+  _globals['_AGENTSTATUSRESPONSE']._serialized_end=773
+  _globals['_LISTAGENTSREQUEST']._serialized_start=775
+  _globals['_LISTAGENTSREQUEST']._serialized_end=893
+  _globals['_LISTAGENTSRESPONSE']._serialized_start=895
+  _globals['_LISTAGENTSRESPONSE']._serialized_end=966
+  _globals['_STOPAGENTREQUEST']._serialized_start=968
+  _globals['_STOPAGENTREQUEST']._serialized_end=1020
+  _globals['_STOPAGENTRESPONSE']._serialized_start=1022
+  _globals['_STOPAGENTRESPONSE']._serialized_end=1093
+  _globals['_STREAMAGENTEVENTSREQUEST']._serialized_start=1095
+  _globals['_STREAMAGENTEVENTSREQUEST']._serialized_end=1139
+  _globals['_AGENTEVENT']._serialized_start=1142
+  _globals['_AGENTEVENT']._serialized_end=1335
+  _globals['_AGENTEVENT_METADATAENTRY']._serialized_start=1288
+  _globals['_AGENTEVENT_METADATAENTRY']._serialized_end=1335
+  _globals['_STREAMAGENTSTATUSREQUEST']._serialized_start=1337
+  _globals['_STREAMAGENTSTATUSREQUEST']._serialized_end=1403
+  _globals['_AGENTSTATUSUPDATE']._serialized_start=1406
+  _globals['_AGENTSTATUSUPDATE']._serialized_end=1569
+  _globals['_AGENTMANAGERSERVICE']._serialized_start=1997
+  _globals['_AGENTMANAGERSERVICE']._serialized_end=2536
 # @@protoc_insertion_point(module_scope)

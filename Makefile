@@ -64,7 +64,13 @@ proto:
 			--es_opt=target=ts,import_extension=none \
 			--connect-es_out=WebApp/src/gen \
 			--connect-es_opt=target=ts,import_extension=none \
-			contest.proto"
+			contest.proto && \
+		protoc -I . -I /usr/include \
+			--es_out=WebApp/src/gen \
+			--es_opt=target=ts,import_extension=none \
+			--connect-es_out=WebApp/src/gen \
+			--connect-es_opt=target=ts,import_extension=none \
+			agent_manager.proto"
 	@echo "✅ Protobuf generation complete"
 
 test-contestmanager:

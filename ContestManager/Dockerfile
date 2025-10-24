@@ -11,10 +11,14 @@ COPY ContestManager/go.mod ContestManager/go.sum ./
 
 RUN go mod download && go mod verify
 
+COPY ContestManager/data ./data
+COPY ContestManager/internal ./internal
+COPY ContestManager/api ./api
+COPY ContestManager/cmd ./cmd
 
-COPY ContestManager/ .
-
-RUN CGO_ENABLED=0 GOOS=linux go build \
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    CGO_ENABLED=0 GOOS=linux go build \
     -ldflags='-w -s' \
     -o server ./cmd/server && \
     CGO_ENABLED=0 GOOS=linux go build \
